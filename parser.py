@@ -11,10 +11,13 @@ import boto3
 from dotenv import load_dotenv
 import tempfile
 import asyncio
+from supabase import create_client
 from pypdf import PdfReader
-from fastapi import FastAPI, Form, File, UploadFile, BackgroundTasks
+from fastapi import FastAPI, Form, File, UploadFile, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
+
+import data_handlers
 
 load_dotenv()
 s3 = boto3.client("s3")
@@ -41,73 +44,39 @@ def archive_pdf(pdf_path: str, document_id: str, description: str, bucket: str) 
 
     return bucket, key
 
-def parse_pdf_to_chunks(pdf_path: str, document_id: str, db_connection):
+def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, db_connection, bucket, bucket_key):
     """
     Parse a PDF and store its text chunks in PostgreSQL.
     """
 
     reader = PdfReader(pdf_path) # object that can read pdfs
 
-    with db_connection.cursor() as cursor: #
-        # switch to supabase?
+    chunk_index = 0
 
-        chunk_index = 0
+    for page_number, page in enumerate(reader.pages, start=1):
+        # this currently chunks by page which is not the best strategy long term
 
-        for page_number, page in enumerate(reader.pages, start=1):
-            # this currently chunks by page which is not the best strategy long term
+        text = page.extract_text()
 
-            text = page.extract_text()
+        if not text:
+            continue
 
-            if not text:
-                continue
+        # Placeholder chunking strategy for now.
+        # This can later be replaced by a proper chunker.
+        chunks = [text]
 
-            # Placeholder chunking strategy for now.
-            # This can later be replaced by a proper chunker.
-            chunks = [text]
+        for chunk in chunks:
+            data_handlers.add_chunk(db_connection, document_name, document_desc, page_number, chunk_index, bucket_key)
+            find_relevances(db_connection, text, document_desc, document_name, chunk_index)
+            chunk_index == 1
 
-            for chunk in chunks:
-
-                cursor.execute(
-                    """
-                    INSERT INTO document_chunks (
-                        id,
-                        document_id,
-                        chunk_index,
-                        page_start,
-                        page_end,
-                        text
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        str(uuid.uuid4()),
-                        document_id,
-                        chunk_index,
-                        page_number,
-                        page_number,
-                        chunk,
-                    )
-                )
-
-                chunk_index += 1
-
-        cursor.execute(
-            """
-            UPDATE documents
-            SET processing_status = 'parsed',
-                parsed_at = NOW()
-            WHERE id = %s
-            """,
-            (document_id,)
-        )
-
-    db_connection.commit()
-
-def find_relevances(text, text_description):
+def find_relevances(client, text, text_description, document_name, chunk_no):
     relevances = []
     if text_description == "utility_bill":
         relevances.append("scope2_via_utility_bills")
+        response = data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_id=1)
     # etc etc
+
 
 async def async_main_orchestrator(pdf_path, document_name, description):
 
@@ -121,12 +90,18 @@ async def async_main_orchestrator(pdf_path, document_name, description):
     bucket_response = s3client.list_buckets()
     bucket = bucket_response['Buckets'][-1]
 
-    bucket, key = archive_pdf(pdf_path, document_id, description, bucket)
+    bucket, bucket_key = archive_pdf(pdf_path, document_id, description, bucket)
 
     # connect to database get db_connection
-    # set up supabase and use that instead
+    sb_url = os.getenv("SUPABASE_URL")
+    sb_key = os.getenv("SUPABASE_ADMIN_KEY")
 
-    parse_pdf_to_chunks(pdf_path, key, db_connection) # replace cursor with supabase if using that whihc might be better for now
+    db_connection = create_client(
+        sb_url,
+        sb_key
+    )
+
+    parse_pdf_to_chunks(pdf_path, document_name, description, db_connection, bucket, bucket_key)
 
 def main_orchestrator(pdf_path, document_name, description):
 
@@ -143,7 +118,13 @@ def main_orchestrator(pdf_path, document_name, description):
     bucket, key = archive_pdf(pdf_path, document_id, description, bucket)
 
     # connect to database get db_connection
-    # set up supabase and use that instead
+    sb_url = os.getenv("SUPABASE_URL")
+    sb_key = os.getenv("SUPABASE_ADMIN_KEY")
+
+    db_connection = create_client(
+        sb_url,
+        sb_key
+    )
 
     parse_pdf_to_chunks(pdf_path, key, db_connection) # replace cursor with supabase if using that whihc might be better for now
 
@@ -187,13 +168,11 @@ async def upload_document(
 
 
 
-# das videos x 2
-# flaw with form - says upload failed but prints the thing, also does not create a file
-
-# Supabase Implementation
-# test 3 bucket process
-
 # LLM stuff
+# test 3 bucket process
+# test caching process
+# response handling (get claude to do this)
+
 
 # candidate row cache + auditing interface
 
