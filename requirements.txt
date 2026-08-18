@@ -1,0 +1,12 @@
+openai
+uuid
+boto3
+tempfile
+asyncio
+
+from dotenv load_dotenv
+from supabase create_client
+from pypdf PdfReader
+from fastapi FastAPI, Form, File, UploadFile, BackgroundTasks, HTTPException
+from fastapi.middleware.cors CORSMiddleware
+from starlette.concurrency run_in_threadpool

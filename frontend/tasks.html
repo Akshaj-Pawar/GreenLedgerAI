@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Select Tasks</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; color: #222; }
+  h1 { font-size: 1.3rem; }
+  #doc-info { font-size: 0.85rem; color: #666; margin-bottom: 20px; }
+  .task-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid #eee;
+  }
+  .task-option label { font-size: 0.95rem; cursor: pointer; }
+  button {
+    margin-top: 20px; padding: 10px 18px; border: none; border-radius: 4px;
+    background: #222; color: white; font: inherit; cursor: pointer;
+  }
+  button:disabled { background: #999; cursor: not-allowed; }
+  #status { margin-top: 14px; font-size: 0.9rem; }
+ 
+  #results-section {
+    margin-top: 36px; padding-top: 20px; border-top: 1px solid #ddd;
+  }
+  #results-section h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  #results-display {
+    min-height: 80px; padding: 12px; border: 1px dashed #ccc; border-radius: 4px;
+    font-size: 0.9rem; color: #888;
+  }
+</style>
+</head>
+<body>
+ 
+<h1>Select tasks to run</h1>
+<div id="doc-info">Loading document info...</div>
+ 
+<form id="tasks-form">
+  <div class="task-option">
+    <input type="checkbox" id="task-extract" name="tasks" value="extract_text">
+    <label for="task-extract">Extract text</label>
+  </div>
+  <div class="task-option">
+    <input type="checkbox" id="task-summarize" name="tasks" value="summarize">
+    <label for="task-summarize">Summarize</label>
+  </div>
+  <div class="task-option">
+    <input type="checkbox" id="task-translate" name="tasks" value="translate">
+    <label for="task-translate">Translate</label>
+  </div>
+  <div class="task-option">
+    <input type="checkbox" id="task-classify" name="tasks" value="classify">
+    <label for="task-classify">Classify document type</label>
+  </div>
+ 
+  <button type="submit" id="submit-btn">Run selected tasks</button>
+  <div id="status"></div>
+</form>
+ 
+<div id="results-section">
+  <h2>Results</h2>
+  <!-- Empty for now -- this is where task output will eventually be rendered -->
+  <div id="results-display">No results yet.</div>
+</div>
+ 
+<script>
+  // Read document_name and file_path that were passed in via the URL
+  // when this page was redirected to from the upload page.
+  const params = new URLSearchParams(window.location.search);
+  const documentName = params.get("document_name");
+  const filePath = params.get("file_path");
+ 
+  const docInfo = document.getElementById("doc-info");
+  docInfo.textContent = documentName
+    ? `Document: ${documentName}`
+    : "No document reference found — go back and upload a document first.";
+ 
+  const form = document.getElementById("tasks-form");
+  const statusEl = document.getElementById("status");
+  const submitBtn = document.getElementById("submit-btn");
+  const resultsDisplay = document.getElementById("results-display");
+ 
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+ 
+    // Collect all checked task checkboxes into an array of their values.
+    const selectedTasks = Array.from(
+      document.querySelectorAll('input[name="tasks"]:checked')
+    ).map((el) => el.value);
+ 
+    if (selectedTasks.length === 0) {
+      statusEl.textContent = "Select at least one task.";
+      return;
+    }
+ 
+    submitBtn.disabled = true;
+    statusEl.textContent = "Running tasks...";
+ 
+    try {
+      const response = await fetch("http://localhost:8000/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document_name: documentName,
+          file_path: filePath,
+          tasks: selectedTasks
+        })
+      });
+ 
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+ 
+      const data = await response.json();
+      statusEl.textContent = "Tasks completed.";
+ 
+      // Placeholder -- once the backend actually returns task output,
+      // this is where it gets rendered instead of raw JSON.
+      resultsDisplay.textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+      statusEl.textContent = `Task run failed: ${err.message}`;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+ 
+</body>
+</html>

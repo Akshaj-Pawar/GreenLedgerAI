@@ -66,15 +66,15 @@ def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, d
         chunks = [text]
 
         for chunk in chunks:
-            data_handlers.add_chunk(db_connection, document_name, document_desc, page_number, chunk_index, bucket_key)
+            data_handlers.add_chunk(db_connection, document_name, document_desc, page_number, chunk_index, bucket_key, chunk)
             find_relevances(db_connection, text, document_desc, document_name, chunk_index)
             chunk_index == 1
 
 def find_relevances(client, text, text_description, document_name, chunk_no):
     relevances = []
     if text_description == "utility_bill":
-        relevances.append("scope2_via_utility_bills")
-        response = data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_id=1)
+        relevances.append("scope2_from_utility_bills")
+        response = data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_name="scope2_from_utility_bills")
     # etc etc
 
 
@@ -167,20 +167,10 @@ async def upload_document(
 
 
 
-
-# LLM stuff
 # test 3 bucket process
 # test caching process
-# response handling (get claude to do this)
-
-
 # candidate row cache + auditing interface
-
-
-# Pick modules and Stuff
-
-# Worldbuilding + Happy place building for apprentices
-# Trees and Beetles
-# Iris and the Minotaur Good Tone + Vibes, Morals don't fit
-# Four Cooking Pots fine tune
-# Mammoth story - goated fr
+# switch the description from open text to a dropdown menu
+# response handling (get claude to do this)
+# archive system needs a revamp, need to figure out how to restrict access to only a company's own documents
+# should restructure the forntend to be secure, filepath should not come from client side, instead

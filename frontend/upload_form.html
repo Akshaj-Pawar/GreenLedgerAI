@@ -77,7 +77,14 @@
  
       const data = await response.json();
       statusEl.textContent = `Success: ${data.document_name} uploaded.`;
-      form.reset();
+
+      // Redirect to the tasks page, passing along the identifiers it needs.
+      const params = new URLSearchParams({
+      document_name: data.document_name,
+      file_path: data.file_path
+      });
+      window.location.href = `tasks.html?${params.toString()}`;
+
     } catch (err) {
       statusEl.textContent = `Upload failed: ${err.message}`;
     } finally {
