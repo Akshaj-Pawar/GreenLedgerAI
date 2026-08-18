@@ -159,32 +159,5 @@ def execute_task(task):
         return data_handlers.get_display_row(db_connection, task, end_date=None, start_date=None)
 
 
-# test redirect
-# make sure both pages are served from the same origin so the relative link tasks.html still resolves as expected
-# test redirect
-
-# registration for next year
-
-# add display board - display as table
-# link execute_task to 
-# let frontend trigger the correct function via a string to function dictionary
-# Test
-
-# registration for next year
 
 
-# ask AI for testing
-
-# test supabase retrieval functions
-# test 3 bucket archiving component
-
-# test the LLM component
-# convert to langchain or response API
-
-# test all scripts individually in their entirety
-
-
-
-# failure handling throughout
-# convert to langchain or something
-# parsing documents form the 3 bucket archive

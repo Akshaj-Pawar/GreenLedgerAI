@@ -1,13 +1,16 @@
 from pydantic import BaseModel
 from typing import List
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter
 
+router = APIRouter()
 
 class TaskRequest(BaseModel):
     document_name: str
     file_path: str
     tasks: List[str]
 
-@app.post("/tasks")
+@router.post("/tasks")
 async def run_tasks(payload: TaskRequest):
     print(payload)
     # payload.document_name, payload.file_path, payload.tasks are now

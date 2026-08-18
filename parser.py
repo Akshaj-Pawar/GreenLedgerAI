@@ -13,14 +13,14 @@ import tempfile
 import asyncio
 from supabase import create_client
 from pypdf import PdfReader
-from fastapi import FastAPI, Form, File, UploadFile, BackgroundTasks, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, Form, File, UploadFile, BackgroundTasks, HTTPException
 from starlette.concurrency import run_in_threadpool
 
 import data_handlers
 
 load_dotenv()
 s3 = boto3.client("s3")
+router = APIRouter()
 
 
 def archive_pdf(pdf_path: str, document_id: str, description: str, bucket: str) -> tuple[str, str]:
@@ -129,25 +129,18 @@ def main_orchestrator(pdf_path, document_name, description):
     parse_pdf_to_chunks(pdf_path, key, db_connection) # replace cursor with supabase if using that whihc might be better for now
 
 
-# FastAPI application functions
 
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # tighten this to your actual frontend origin in production
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-cache_path = os.getenv("CACHE_PATH")
-
-@app.post("/documents")
+@router.post("/documents")
 async def upload_document(
     background_tasks: BackgroundTasks,
     document_name: str = Form(...), # these are clearly undefined
     description: str = Form(...), 
     file: UploadFile = File(...)
     ):
+
+    # FastAPI application functions
+
+    cache_path = os.getenv("CACHE_PATH")
     
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, dir=cache_path) as tmp:
             

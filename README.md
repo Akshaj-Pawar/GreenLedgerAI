@@ -14,8 +14,8 @@ Done:
 
 
 Commands:
-create api route: uvicorn parser:app --reload
-curl post test: curl -X POST http://localhost:8000/documents \
+create api route: uvicorn main:app --reload
+curl post test: curl -X POST http://localhost:8000/static/documents \
   -F "document_name=test doc" \
   -F "description=a test" \
   -F "file=@/path/to/file.pdf"

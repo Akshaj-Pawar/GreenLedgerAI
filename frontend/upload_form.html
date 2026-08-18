@@ -64,7 +64,7 @@
       // "await" pauses this function until the network request finishes,
       // without freezing the rest of the page. That's the whole point of
       // async functions in JS: other things can keep running while we wait.
-      const response = await fetch("http://127.0.0.1:8000/documents", {
+      const response = await fetch("/documents", {
         method: "POST",
         body: formData
         // No Content-Type header set on purpose — the browser sets the
