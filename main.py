@@ -28,26 +28,25 @@ async def root():
 
 
 
-# add display board - display as table
-# link execute_task to display_backend
-# let frontend trigger the correct function via a string to function dictionary
-# Test
-
-# registration for next year
-
+# add display board - display as table - handle none's - surely this is easy
 
 # ask AI for testing
 
 # test supabase retrieval functions
 # test 3 bucket archiving component
-
 # test the LLM component
-# convert to langchain or response API
+
+# double check some stuff - emails, SLC response, look over computer systems
 
 # test all scripts individually in their entirety
 
 
+# replace the type in text with a dropdown select
+# add additional filters to task checkbox
+
+# parsing documents from the 3 bucket archive and restricting access
+# reviewer ux: ease of changing things, ease of viewing chunks
 
 # failure handling throughout
-# convert to langchain or something
-# parsing documents form the 3 bucket archive
+# convert to langchain or something + prompt engineering
+# explore adding async to handler and in general

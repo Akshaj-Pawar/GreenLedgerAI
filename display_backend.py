@@ -3,6 +3,8 @@ from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import APIRouter
 
+import LLM_call
+
 router = APIRouter()
 
 class TaskRequest(BaseModel):
@@ -22,8 +24,11 @@ async def run_tasks(payload: TaskRequest):
     for task in payload.tasks:
         # placeholder -- this is where you'd dispatch to whatever
         # function actually performs each task against payload.file_path
-        results[task] = f"pretend result for {task}"
+
+        # test to see if frontend will work - comment out in deeper tests and production
+        results[task] = {"success": True, "results": [{"col_A": 5, "col_B": 7, "col_C": 9}], "error": None}
+
+        # production code - comment out when testing
+        results[task] = LLM_call.execute_task(task) # returns eg: {"success": True, "results": response, "error": None}
 
     return {"status": "success", "results": results}
-
-# need to replace pretend result with actual result by calling LLM

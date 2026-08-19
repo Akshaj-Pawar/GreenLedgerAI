@@ -52,8 +52,8 @@ def get_chunk(client, document_name, chunk_no_in_doc):
     else:
         return None
 
-def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode):
-    response = client.table("raw_text_cache").insert({
+def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef):
+    response = client.table("scope2_transactions").insert({
         "document_name": document_name,
         "chunk_no_in_doc": chunk_no_in_doc,
         "merchant_name": merchant_name,
@@ -63,13 +63,16 @@ def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_
         "currency": currency,
         "site_name": site_name,
         "site_location_city": site_location_city,
-        "site_postcode": site_postcode
+        "site_postcode": site_postcode,
+        "start_date": start_date,
+        "end_date": end_date,
+        "ef": ef
     }).execute()
     return response
 
-def get_display_row(client, task_name, end_date=None, start_date=None):
+def get_display_rows(client, task_name, end_date=None, start_date=None):
     # from raw_text_cache: document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunks
-    # from scope2_transactions: document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode
+    # from scope2_transactions: document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef
 
     query = (
         client
@@ -106,6 +109,9 @@ def get_display_row(client, task_name, end_date=None, start_date=None):
         #site_name = response.data["scope2_transactions"]["site_name"]
         #site_location_city = response.data["scope2_transactions"]["site_location_city"]
         #site_postcode = response.data["scope2_transactions"]["site_postcode"]
+        #start_date = response.data["scope2_transactions"]["start_date"]
+        #end_date = response.data["scope2_transactions"]["end_date"]
+        #ef = response.data["scope2_transactions"]["ef"]
         #document_desc = response.data["document_desc"]
         #page_no = response.data["page_no"]
         #chunk_no_in_doc = response.data["chunk_no_in_doc"]

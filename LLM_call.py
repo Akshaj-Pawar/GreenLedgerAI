@@ -5,16 +5,26 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 import data_handlers
+import estimation_algs
 
 
 load_dotenv()
 
 key = os.getenv("OPENAI_API_KEY")
 
+def flatten_dict(d, parent_key="", sep="."):
+    items = {}
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.update(flatten_dict(v, new_key, sep))
+        else:
+            items[new_key] = v
+    return items
+
 def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection):
 
     chunk = data_handlers.get_chunk(document_name, chunk_no_in_doc)
-    # output_row_format = ["merchant_name", "date", "product", "cost", "currency", "site_name", "site_location_city", "site_postcode"]
     relevance_def =  "transaction refers to an energy utility bill payment, or any such payemnt referring to the purchase of grid energy, such as would be relevant in a scope 2 emissions calculation"
 
 
@@ -97,7 +107,15 @@ def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client
                                 "type": ["string", "null"],
                                 "description": "The postcode of the building or site that is being billed."               
                             },
-                            "required": ["description","date","merchant_name","product","cost","currency","kwhs","site_name","site_location_city","site_postcode"],
+                            "start_date": {
+                                "type": ["string", "null"],
+                                "description": "For subscription services or utility payments: date at which the billing period covered by the payment record begins."               
+                            },
+                            "end_date": {
+                                "type": ["string", "null"],
+                                "description": "For subscription services or utility payments: date at which the billing period covered by the payment record ends."               
+                            },
+                            "required": ["description","date","merchant_name","product","cost","currency","kwhs","site_name","site_location_city","site_postcode","start_date","end_date"],
                             "additionalProperties": False
                         }
                         }
@@ -119,7 +137,8 @@ def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client
 
     for t in output['transactions']:
         output_dict = t["items"]
-        data_handlers.add_scope2_transaction_row(db_connection, document_name, chunk_no_in_doc, output_dict["merchant_name"], output_dict["date"], output_dict["product"], output_dict["cost"], output_dict["currency"], output_dict["site_name"], output_dict["site_location_city"], output_dict["site_postcode"])
+        ef = estimation_algs.scope2_fub_get_ef(output_dict["site_location_city"], output_dict["site_postcode"], output_dict["merchant_name"], output_dict["product"], output_dict["cost"], output_dict["currency"], output_dict["start_date"], output_dict["end_date"])
+        data_handlers.add_scope2_transaction_row(db_connection, document_name, chunk_no_in_doc, output_dict["merchant_name"], output_dict["date"], output_dict["product"], output_dict["cost"], output_dict["currency"], output_dict["site_name"], output_dict["site_location_city"], output_dict["site_postcode"], output_dict["start_date"], output_dict["end_date"], ef)
         # add to a postgres db
 
 
@@ -142,21 +161,45 @@ def test_task_scope2_fub():
 
 def execute_task(task):
 
-    sb_url = os.getenv("SUPABASE_URL")
-    sb_key = os.getenv("SUPABASE_ADMIN_KEY")
+    TASK_HANDLERS = {
+        "scope2_from_utility_bills": task_scope2_from_utility_bills,
+        # keep updated with lists of tasks
+    }
+    handler = TASK_HANDLERS.get(task)
 
-    db_connection = create_client(
-        sb_url,
-        sb_key
-    )
+    if handler is None:
+        results = {"success": False, "results": None, "error": f"Unknown task: {task}"}
+    else:
+        try:
+            sb_url = os.getenv("SUPABASE_URL")
+            sb_key = os.getenv("SUPABASE_ADMIN_KEY")
 
-    openai_client = OpenAI()
+            db_connection = create_client(
+                sb_url,
+                sb_key
+            )
+            openai_client = OpenAI()
 
-    if task == "scope2_from_utility_bills":
-        chunk_pks = data_handlers.get_chunk_ids("scope2_from_utility_bills")
-        for document_name, chunk_no_in_doc in chunk_pks:
-            task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection)
-        return data_handlers.get_display_row(db_connection, task, end_date=None, start_date=None)
+            chunk_pks = data_handlers.get_chunk_ids(task)
+            for document_name, chunk_no_in_doc in chunk_pks:
+                handler(document_name, chunk_no_in_doc, openai_client, db_connection)
+
+            response = data_handlers.get_display_rows(db_connection, task, end_date=None, start_date=None)
+            for rowi in range(len(response)):
+                row = flatten_dict(response[rowi], parent_key="", sep=".")
+                response[rowi] = row # safe because no deletions or additions
+
+            all_keys = set()
+            for row in response:
+                all_keys.update(row.keys())
+            response = [{k: row.get(k) for k in all_keys} for row in response]
+
+            results = {"success": True, "results": response, "error": None}
+
+        except Exception as e:
+            results = {"success": False, "results": None, "error": str(e)}
+
+    return results
 
 
 
