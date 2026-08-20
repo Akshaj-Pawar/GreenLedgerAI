@@ -168,7 +168,7 @@ def execute_task(task):
     handler = TASK_HANDLERS.get(task)
 
     if handler is None:
-        results = {"success": False, "results": None, "error": f"Unknown task: {task}"}
+        results = {"success": False, "rows": None, "error": f"Unknown task: {task}"}
     else:
         try:
             sb_url = os.getenv("SUPABASE_URL")
@@ -194,10 +194,10 @@ def execute_task(task):
                 all_keys.update(row.keys())
             response = [{k: row.get(k) for k in all_keys} for row in response]
 
-            results = {"success": True, "results": response, "error": None}
+            results = {"success": True, "rows": response, "error": None}
 
         except Exception as e:
-            results = {"success": False, "results": None, "error": str(e)}
+            results = {"success": False, "rows": None, "error": str(e)}
 
     return results
 

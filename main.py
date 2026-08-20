@@ -28,15 +28,11 @@ async def root():
 
 
 
-# add display board - display as table - handle none's - surely this is easy
-
-# ask AI for testing
-
 # test supabase retrieval functions
 # test 3 bucket archiving component
 # test the LLM component
 
-# double check some stuff - emails, SLC response, look over computer systems
+# double check some stuff - emails, SLC response
 
 # test all scripts individually in their entirety
 

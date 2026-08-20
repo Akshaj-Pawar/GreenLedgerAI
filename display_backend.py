@@ -26,9 +26,9 @@ async def run_tasks(payload: TaskRequest):
         # function actually performs each task against payload.file_path
 
         # test to see if frontend will work - comment out in deeper tests and production
-        results[task] = {"success": True, "results": [{"col_A": 5, "col_B": 7, "col_C": 9}], "error": None}
+        results[task] = {"success": True, "rows": [{"col_A": 5, "col_B": 7, "col_C": 9}], "error": None}
 
         # production code - comment out when testing
-        results[task] = LLM_call.execute_task(task) # returns eg: {"success": True, "results": response, "error": None}
+        # results[task] = LLM_call.execute_task(task) # returns eg: {"success": True, "results": response, "error": None}
 
     return {"status": "success", "results": results}

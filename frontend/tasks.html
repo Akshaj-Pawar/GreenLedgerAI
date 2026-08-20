@@ -113,15 +113,120 @@
       const data = await response.json();
       statusEl.textContent = "Tasks completed.";
  
-      // Placeholder -- once the backend actually returns task output,
-      // this is where it gets rendered instead of raw JSON.
-      resultsDisplay.textContent = JSON.stringify(data, null, 2);
+    // Actual Returned Data from Backend in Table Form
+
+    renderResults(data.results);
     } catch (err) {
       statusEl.textContent = `Task run failed: ${err.message}`;
     } finally {
       submitBtn.disabled = false;
     }
   });
+ 
+  // Human-readable labels for task keys -- extend this as you add tasks.
+  const TASK_LABELS = {
+    scope2_from_utility_bills: "scope2_from_utility_bills",
+    task_B: "B",
+    task_C: "C",
+    task_D: "D"
+  };
+ 
+  // results is the `results` object from the backend response:
+  // { task_name: { success: bool, rows: [...] } | { success: false, error: "..." } }
+  function renderResults(results) {
+    resultsDisplay.innerHTML = ""; // clear "No results yet." placeholder
+ 
+    const taskNames = Object.keys(results);
+    if (taskNames.length === 0) {
+      resultsDisplay.textContent = "No tasks returned results.";
+      return;
+    }
+ 
+    taskNames.forEach((taskName) => {
+      const taskResult = results[taskName];
+ 
+      const section = document.createElement("div");
+      section.style.marginBottom = "24px";
+ 
+      const heading = document.createElement("h3");
+      heading.style.fontSize = "0.95rem";
+      heading.textContent = TASK_LABELS[taskName] || taskName;
+      section.appendChild(heading);
+ 
+      if (!taskResult.success) {
+        const errorEl = document.createElement("p");
+        errorEl.style.color = "#b00";
+        errorEl.style.fontSize = "0.85rem";
+        errorEl.textContent = `Failed: ${taskResult.error}`;
+        section.appendChild(errorEl);
+      } else if (!taskResult.rows || taskResult.rows.length === 0) {
+        const emptyEl = document.createElement("p");
+        emptyEl.style.color = "#888";
+        emptyEl.style.fontSize = "0.85rem";
+        emptyEl.textContent = "Succeeded, but returned no rows.";
+        section.appendChild(emptyEl);
+      } else {
+        section.appendChild(buildTable(taskResult.rows));
+      }
+ 
+      resultsDisplay.appendChild(section);
+    });
+  }
+ 
+  // Builds an HTML table from an array of row-objects, inferring columns
+  // from the keys of the first row. Assumes all rows in a given task's
+  // output share the same shape -- if a later row is missing a key, that
+  // cell will just render empty, which is usually the desired fallback.
+  function buildTable(rows) {
+    const columns = Object.keys(rows[0]);
+ 
+    const table = document.createElement("table");
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    table.style.fontSize = "0.85rem";
+ 
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    columns.forEach((col) => {
+      const th = document.createElement("th");
+      th.textContent = col;
+      th.style.textAlign = "left";
+      th.style.borderBottom = "2px solid #ccc";
+      th.style.padding = "6px 8px";
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+ 
+    const tbody = document.createElement("tbody");
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      columns.forEach((col) => {
+        const td = document.createElement("td");
+        // Handles missing keys and nested objects/arrays gracefully.
+        const value = row[col];
+        if (value === undefined) {
+            td.textContent = "";               // key missing entirely from this row
+        } 
+        else if (value === null) {
+            td.textContent = "—";              // key present, value explicitly null
+        }
+        else if (typeof value === "object") {
+            td.textContent = JSON.stringify(value);
+        } 
+        else {
+            td.textContent = value;
+        }
+        td.style.borderBottom = "1px solid #eee";
+        td.style.padding = "6px 8px";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+ 
+    return table;
+  }
 </script>
  
 </body>

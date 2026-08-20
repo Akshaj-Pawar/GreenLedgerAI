@@ -12,6 +12,11 @@
     border: 1px solid #ccc; border-radius: 4px; font: inherit;
   }
   input[type="file"] { margin-top: 6px; }
+  .type-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; font-size: 0.9rem;
+  }
+  .type-option label { margin-top: 0; font-weight: normal; }
   button {
     margin-top: 20px; padding: 10px 18px; border: none; border-radius: 4px;
     background: #222; color: white; font: inherit; cursor: pointer;
@@ -33,9 +38,20 @@
  
   <label for="file">PDF file</label>
   <input type="file" id="file" name="file" accept="application/pdf" required>
- 
+
+  <label>Special types (optional, select any)</label>
+  <div class="type-option">
+    <input type="checkbox" id="type-utility-bill" name="special_types" value="utility_bill">
+    <label for="type-utility-bill">Utility_Bill</label>
+  </div>
+  <div class="type-option">
+    <input type="checkbox" id="type-energy-payment" name="special_types" value="energy_payment">
+    <label for="type-energy-payment">Energy Payment (eg vehicles)</label>
+  </div>
+
   <button type="submit" id="submit-btn">Upload</button>
   <div id="status"></div>
+
 </form>
  
 <script>
@@ -60,6 +76,15 @@
     formData.append("description", document.getElementById("description").value);
     formData.append("file", document.getElementById("file").files[0]);
  
+    // Append one entry per checked box, all under the same field name.
+    // FormData supports repeated keys -- this is how a list gets sent
+    // over multipart/form-data (as opposed to JSON, where you'd just
+    // use a single array).
+    const selectedTypes = Array.from(
+      document.querySelectorAll('input[name="special_types"]:checked')
+    ).map((el) => el.value);
+    selectedTypes.forEach((type) => formData.append("special_types", type));
+
     try {
       // "await" pauses this function until the network request finishes,
       // without freezing the rest of the page. That's the whole point of

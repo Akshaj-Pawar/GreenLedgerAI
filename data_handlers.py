@@ -99,6 +99,8 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
 
     if response.data:
 
+        # reference doc:
+
         #document_name = response.data["document_name"]
         #chunk_no_in_doc = response.data["chunk_no_in_doc"]
         #merchant_name = response.data["scope2_transactions"]["merchant_name"]
@@ -124,6 +126,8 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
     else:
         return None
 
-
+def debug_reset_database(client):
+    client.rpc("debug_reset_database").execute()
+    # delete scope2_transactions then delete raw_chunk_relevancies then delete chunks
 
 # response unpacking

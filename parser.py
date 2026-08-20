@@ -15,6 +15,7 @@ from supabase import create_client
 from pypdf import PdfReader
 from fastapi import APIRouter, Form, File, UploadFile, BackgroundTasks, HTTPException
 from starlette.concurrency import run_in_threadpool
+from typing import List
 
 import data_handlers
 
@@ -23,7 +24,7 @@ s3 = boto3.client("s3")
 router = APIRouter()
 
 
-def archive_pdf(pdf_path: str, document_id: str, description: str, bucket: str) -> tuple[str, str]:
+def archive_pdf(pdf_path: str, document_id: str, document_name: str, description: str, special_types: list[str], bucket: str) -> tuple[str, str]:
     """
     Upload the original PDF to S3.
 
@@ -44,7 +45,7 @@ def archive_pdf(pdf_path: str, document_id: str, description: str, bucket: str) 
 
     return bucket, key
 
-def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, db_connection, bucket, bucket_key):
+def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, special_types: list[str], db_connection, bucket, bucket_key):
     """
     Parse a PDF and store its text chunks in PostgreSQL.
     """
@@ -67,18 +68,18 @@ def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, d
 
         for chunk in chunks:
             data_handlers.add_chunk(db_connection, document_name, document_desc, page_number, chunk_index, bucket_key, chunk)
-            find_relevances(db_connection, text, document_desc, document_name, chunk_index)
+            find_relevances(db_connection, text, document_desc, document_name, chunk_index, special_types)
             chunk_index == 1
 
-def find_relevances(client, text, text_description, document_name, chunk_no):
+def find_relevances(client, text, text_description, document_name, chunk_no, special_types):
     relevances = []
-    if text_description == "utility_bill":
+    if "utility_bill" in special_types:
         relevances.append("scope2_from_utility_bills")
         response = data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_name="scope2_from_utility_bills")
     # etc etc
 
 
-async def async_main_orchestrator(pdf_path, document_name, description):
+async def async_main_orchestrator(pdf_path, document_name, description, special_types):
 
     document_id = str(uuid.uuid4()) # may be different to the supabase uuid
 
@@ -90,7 +91,7 @@ async def async_main_orchestrator(pdf_path, document_name, description):
     bucket_response = s3client.list_buckets()
     bucket = bucket_response['Buckets'][-1]
 
-    bucket, bucket_key = archive_pdf(pdf_path, document_id, description, bucket)
+    bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
 
     # connect to database get db_connection
     sb_url = os.getenv("SUPABASE_URL")
@@ -101,9 +102,9 @@ async def async_main_orchestrator(pdf_path, document_name, description):
         sb_key
     )
 
-    parse_pdf_to_chunks(pdf_path, document_name, description, db_connection, bucket, bucket_key)
+    parse_pdf_to_chunks(pdf_path, document_name, description, special_types, db_connection, bucket, bucket_key)
 
-def main_orchestrator(pdf_path, document_name, description):
+def main_orchestrator(pdf_path, document_name, description, special_types):
 
     document_id = str(uuid.uuid4()) # may be different to the supabase uuid
 
@@ -115,7 +116,7 @@ def main_orchestrator(pdf_path, document_name, description):
     bucket_response = s3client.list_buckets()
     bucket = bucket_response['Buckets'][-1]
 
-    bucket, key = archive_pdf(pdf_path, document_id, description, bucket)
+    bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
 
     # connect to database get db_connection
     sb_url = os.getenv("SUPABASE_URL")
@@ -126,16 +127,17 @@ def main_orchestrator(pdf_path, document_name, description):
         sb_key
     )
 
-    parse_pdf_to_chunks(pdf_path, key, db_connection) # replace cursor with supabase if using that whihc might be better for now
+    parse_pdf_to_chunks(pdf_path, document_name, description, special_types, db_connection, bucket, bucket_key)
 
 
 
 @router.post("/documents")
 async def upload_document(
     background_tasks: BackgroundTasks,
-    document_name: str = Form(...), # these are clearly undefined
+    document_name: str = Form(...),
     description: str = Form(...), 
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    special_types: List[str] = Form([])
     ):
 
     # FastAPI application functions
@@ -149,8 +151,8 @@ async def upload_document(
         contents = await file.read()
         tmp.write(contents)
 
-    # await run_in_threadpool(main_orchestrator(file_path, document_name, description))
-    # await async_main_orchestrator(file_path, document_name, description)
+    # await run_in_threadpool(main_orchestrator(file_path, document_name, description, special_types))
+    # await async_main_orchestrator(file_path, document_name, description, special_types)
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})
 
