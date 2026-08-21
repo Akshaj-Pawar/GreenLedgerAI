@@ -28,21 +28,18 @@ async def root():
 
 
 
-# test supabase retrieval functions
-# test 3 bucket archiving component
-# test the LLM component
+# test parser script in its entirety (comment out archive funcitonality for now)
+# test the LLM component + plumbing
 
 # double check some stuff - emails, SLC response
 
-# test all scripts individually in their entirety
-
-
-# replace the type in text with a dropdown select
-# add additional filters to task checkbox
-
-# parsing documents from the 3 bucket archive and restricting access
-# reviewer ux: ease of changing things, ease of viewing chunks
 
 # failure handling throughout
 # convert to langchain or something + prompt engineering
+
+
+# add additional filters to task checkbox
+# parsing documents from the 3 bucket archive and restricting access
+# reviewer ux: ease of changing things, ease of viewing chunks
+
 # explore adding async to handler and in general

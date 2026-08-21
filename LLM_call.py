@@ -156,7 +156,8 @@ def test_task_scope2_fub():
     openai_client = OpenAI()
 
     chunk_pks = data_handlers.get_chunk_ids()
-    for document_name, chunk_no_in_doc in chunk_pks:
+    for row in chunk_pks:
+        document_name, chunk_no_in_doc = row
         task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection)
 
 def execute_task(task):
@@ -181,7 +182,8 @@ def execute_task(task):
             openai_client = OpenAI()
 
             chunk_pks = data_handlers.get_chunk_ids(task)
-            for document_name, chunk_no_in_doc in chunk_pks:
+            for row in chunk_pks:
+                document_name, chunk_no_in_doc = row
                 handler(document_name, chunk_no_in_doc, openai_client, db_connection)
 
             response = data_handlers.get_display_rows(db_connection, task, end_date=None, start_date=None)
