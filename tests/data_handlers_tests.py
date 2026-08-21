@@ -9,9 +9,6 @@ load_dotenv()
 sb_url = os.getenv("SUPABASE_URL")
 sb_key = os.getenv("SUPABASE_ADMIN_KEY")
 
-print("sb_url:", repr(sb_url))
-print("sb_key length:", len(sb_key))
-
 client = create_client(
     sb_url,
     sb_key

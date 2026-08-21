@@ -16,6 +16,7 @@ from pypdf import PdfReader
 from fastapi import APIRouter, Form, File, UploadFile, BackgroundTasks, HTTPException
 from starlette.concurrency import run_in_threadpool
 from typing import List
+import re
 
 import data_handlers
 
@@ -69,13 +70,13 @@ def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, s
         for chunk in chunks:
             data_handlers.add_chunk(db_connection, document_name, document_desc, page_number, chunk_index, bucket_key, chunk)
             find_relevances(db_connection, text, document_desc, document_name, chunk_index, special_types)
-            chunk_index == 1
+            chunk_index += 1
 
 def find_relevances(client, text, text_description, document_name, chunk_no, special_types):
     relevances = []
     if "utility_bill" in special_types:
         relevances.append("scope2_from_utility_bills")
-        response = data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_name="scope2_from_utility_bills")
+        data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_name="scope2_from_utility_bills")
     # etc etc
 
 
@@ -91,7 +92,9 @@ async def async_main_orchestrator(pdf_path, document_name, description, special_
     bucket_response = s3client.list_buckets()
     bucket = bucket_response['Buckets'][-1]
 
-    bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
+    # to be implemented later:
+    # bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
+    bucket_key = ""
 
     # connect to database get db_connection
     sb_url = os.getenv("SUPABASE_URL")
@@ -109,14 +112,34 @@ def main_orchestrator(pdf_path, document_name, description, special_types):
     document_id = str(uuid.uuid4()) # may be different to the supabase uuid
 
     # create bucket
-    s3session = boto3.Session(region_name = 'eu-west-2')
-    s3client = s3session.client("s3")
-    bucket_name = document_name + document_id
-    s3client.create_bucket(Bucket=bucket_name)
-    bucket_response = s3client.list_buckets()
-    bucket = bucket_response['Buckets'][-1]
+    s3session = boto3.Session(
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION", "eu-west-2")
+    )
 
-    bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
+    s3client = s3session.client("s3")
+
+    safe_document_name = re.sub(
+        r"[^a-z0-9-]",
+        "-",
+        document_name.lower()
+    )
+    bucket_name = f"{safe_document_name}-{document_id}"
+    
+    s3client.create_bucket(
+        Bucket=bucket_name,
+        CreateBucketConfiguration={
+            "LocationConstraint": "eu-west-2"
+        }
+    )
+    bucket = {
+        "Name": bucket_name
+    }
+
+    # to be implemented later:
+    # bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
+    bucket_key = "" # placeholder
 
     # connect to database get db_connection
     sb_url = os.getenv("SUPABASE_URL")
@@ -143,7 +166,8 @@ async def upload_document(
     # FastAPI application functions
 
     cache_path = os.getenv("CACHE_PATH")
-    
+
+    # tested and works
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, dir=cache_path) as tmp:
             
         file_path = tmp.name
@@ -151,7 +175,7 @@ async def upload_document(
         contents = await file.read()
         tmp.write(contents)
 
-    # await run_in_threadpool(main_orchestrator(file_path, document_name, description, special_types))
+    await run_in_threadpool(main_orchestrator(file_path, document_name, description, special_types))
     # await async_main_orchestrator(file_path, document_name, description, special_types)
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})

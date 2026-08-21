@@ -28,7 +28,7 @@ async def root():
 
 
 
-# test parser script in its entirety (comment out archive funcitonality for now)
+# test parser script in its entirety
 # test the LLM component + plumbing
 
 # double check some stuff - emails, SLC response
@@ -36,10 +36,11 @@ async def root():
 
 # failure handling throughout
 # convert to langchain or something + prompt engineering
+# integrate tests 
 
 
+# test archiving, implement retrieving from the 3 bucket archive, with restricted access
 # add additional filters to task checkbox
-# parsing documents from the 3 bucket archive and restricting access
 # reviewer ux: ease of changing things, ease of viewing chunks
 
 # explore adding async to handler and in general
