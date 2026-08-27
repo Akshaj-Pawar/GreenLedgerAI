@@ -29,6 +29,7 @@ async def root():
 
 # Week One
 
+# make requirements.txt and document scripts and functions
 # send demo
 # integrate tests - delegate
 # test on different models and come to final test idea - delegate

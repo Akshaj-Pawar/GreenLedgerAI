@@ -1,12 +1,9 @@
-openai
-uuid
-boto3
-tempfile
-asyncio
-
-from dotenv load_dotenv
-from supabase create_client
-from pypdf PdfReader
-from fastapi FastAPI, Form, File, UploadFile, BackgroundTasks, HTTPException
-from fastapi.middleware.cors CORSMiddleware
-from starlette.concurrency run_in_threadpool
+boto3==1.43.67
+fastapi==0.141.1
+python-dotenv==1.2.2
+pypdf==6.15.0
+pydantic==2.13.4
+openai==3.0.0
+supabase==2.31.0
+starlette==1.6.0
+uvicorn==0.52.1
