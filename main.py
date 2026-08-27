@@ -29,27 +29,24 @@ async def root():
 
 # Week One
 
-# fix the flattening problem
-# retest
-
 # send demo
-# add a claude version
-# users as primary key in initial cache
-
-
-# table should show chunks when asked to
-# back button and switch from automatic redirect to button revelation
-# final archive phase and reset afterwards - send the user some sql files, clean the users cache (possibly)
-
 # integrate tests - delegate
 # test on different models and come to final test idea - delegate
+
+# add a claude version
+# users as primary key in initial cache
+# retest with claude
+
+# table should show chunks when asked to, and redirect to edit when asked to
+# back button and switch from automatic redirect to button based redirect
+# final archive phase and reset afterwards - send the user some sql files, clean the users cache (possibly)
 
 
 # Week 2+3
 
-# reviewer ux: view row, override row
 # test archiving, implement retrieving from the 3 bucket archive, with restricted access
-# seperate page for accessing archived documents
+# accessing archived documents frontend
+# reviewer ux: override row
 
 # find an even better form of chunking, don't send out the whole thing at once, may require intelligent merging
 # add and test vectorisation layer

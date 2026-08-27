@@ -82,7 +82,8 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
     # from raw_text_cache: document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunks
     # from scope2_transactions: document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef
 
-    task_table_name = "scope2_transactions"
+    task_table_names = {"scope2_from_utility_bills": "scope2_transactions"}
+    task_table_name = task_table_names[task_name]
 
     query = (
         client
@@ -113,13 +114,10 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
 
         for chunk in response.data:
 
-            transactions = chunk.pop(task_table_name, [])
+            transactions = chunk.get(task_table_name, [])
 
             if len(transactions) == 0:
                 continue
-
-            # We don't need this in the final display row
-            chunk.pop("raw_chunk_relevances", None)
 
             for transaction in transactions:
 
@@ -127,6 +125,10 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
                     **chunk,
                     **transaction
                 }
+
+                # Remove fields we don't want in the display row
+                row.pop(task_table_name, None)
+                row.pop("raw_chunk_relevances", None)
 
                 display_rows.append(row)
 
