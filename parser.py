@@ -126,7 +126,7 @@ def main_orchestrator(pdf_path, document_name, description, special_types):
         document_name.lower()
     )
     bucket_name = f"{safe_document_name}-{document_id}"
-    
+
     s3client.create_bucket(
         Bucket=bucket_name,
         CreateBucketConfiguration={
@@ -175,7 +175,9 @@ async def upload_document(
         contents = await file.read()
         tmp.write(contents)
 
-    await run_in_threadpool(main_orchestrator(file_path, document_name, description, special_types))
+        document_name =  f"{document_name}_{os.path.basename(file_path)}"
+
+    await run_in_threadpool(main_orchestrator, file_path, document_name, description, special_types)
     # await async_main_orchestrator(file_path, document_name, description, special_types)
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})
@@ -185,11 +187,3 @@ async def upload_document(
     return {"status": "success", "document_name": document_name, "file_path": file_path}
 
 
-
-# test 3 bucket process
-# test caching process
-# candidate row cache + auditing interface
-# switch the description from open text to a dropdown menu
-# response handling (get claude to do this)
-# archive system needs a revamp, need to figure out how to restrict access to only a company's own documents
-# should restructure the forntend to be secure, filepath should not come from client side, instead

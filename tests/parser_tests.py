@@ -158,15 +158,15 @@ data_handlers.debug_reset_database(client)
 
 pdf_path = "cache/test.pdf"
 
-#test_parse_pdf_to_chunks(client, pdf_path)
-#print("TESTS PASSED")
+test_parse_pdf_to_chunks(client, pdf_path)
+print("TESTS PASSED")
 
-#data_handlers.debug_reset_database(client)
+data_handlers.debug_reset_database(client)
 
-#test_parse_pdf_to_chunks_creates_relevances(client, pdf_path)
-#print("TESTS PASSED")
+test_parse_pdf_to_chunks_creates_relevances(client, pdf_path)
+print("TESTS PASSED")
 
-#data_handlers.debug_reset_database(client)
+data_handlers.debug_reset_database(client)
 
 document_name = "test.pdf"
 description = "Test document"

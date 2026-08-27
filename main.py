@@ -28,19 +28,36 @@ async def root():
 
 
 
-# test parser script in its entirety
 # test the LLM component + plumbing
 
-# double check some stuff - emails, SLC response
 
-
-# failure handling throughout
+# 1: Model quality improvement
 # convert to langchain or something + prompt engineering
 # integrate tests 
+# test on different models and come to final test idea
 
 
+# 2: Usability
+# failure handling throughout
+# reviewer ux: view row, override row
 # test archiving, implement retrieving from the 3 bucket archive, with restricted access
-# add additional filters to task checkbox
-# reviewer ux: ease of changing things, ease of viewing chunks
+# add evidence graph
+
+
+# 3: add and test chunking and vectorisation layer
+# human review chunking?
+
+
+# 4: new functionality to task:
+# scope 1 / 2 / 3
+# product intelligence + lifecycle intelligence
+# IOT ingestion and processing
+
+
+# new tasks:
+# what if scenario modelling: supplier changes
+# continuous monitoring and real time ingestion (good idea?)
 
 # explore adding async to handler and in general
+# best practices for human in the loop
+# apply any new skills you learn
