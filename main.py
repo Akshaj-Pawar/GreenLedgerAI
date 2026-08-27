@@ -27,35 +27,45 @@ async def root():
     return RedirectResponse(url="/static/upload_form.html")
 
 
+# Week One
 
-# test the LLM component + plumbing
+# fix the flattening problem
+# retest
+
+# send demo
+# add a claude version
+# users as primary key in initial cache
 
 
-# 1: Model quality improvement
-# convert to langchain or something + prompt engineering
-# integrate tests 
-# test on different models and come to final test idea
+# table should show chunks when asked to
+# back button and switch from automatic redirect to button revelation
+# final archive phase and reset afterwards - send the user some sql files, clean the users cache (possibly)
+
+# integrate tests - delegate
+# test on different models and come to final test idea - delegate
 
 
-# 2: Usability
-# failure handling throughout
+# Week 2+3
+
 # reviewer ux: view row, override row
 # test archiving, implement retrieving from the 3 bucket archive, with restricted access
-# add evidence graph
+# seperate page for accessing archived documents
 
-
-# 3: add and test chunking and vectorisation layer
+# find an even better form of chunking, don't send out the whole thing at once, may require intelligent merging
+# add and test vectorisation layer
 # human review chunking?
 
-
-# 4: new functionality to task:
+# new functionality to task:
 # scope 1 / 2 / 3
 # product intelligence + lifecycle intelligence
 # IOT ingestion and processing
 
 
-# new tasks:
+# Later / idc
 # what if scenario modelling: supplier changes
+# add evidence graph (whatever tf this is)
+
+
 # continuous monitoring and real time ingestion (good idea?)
 
 # explore adding async to handler and in general

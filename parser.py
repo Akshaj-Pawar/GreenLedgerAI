@@ -55,6 +55,8 @@ def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, s
 
     chunk_index = 0
 
+    chunks = [["", []]]
+
     for page_number, page in enumerate(reader.pages, start=1):
         # this currently chunks by page which is not the best strategy long term
 
@@ -65,12 +67,14 @@ def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, s
 
         # Placeholder chunking strategy for now.
         # This can later be replaced by a proper chunker.
-        chunks = [text]
+        chunks[0][0] += text + "\n"
+        chunks[0][1].append(page_number)
 
-        for chunk in chunks:
-            data_handlers.add_chunk(db_connection, document_name, document_desc, page_number, chunk_index, bucket_key, chunk)
-            find_relevances(db_connection, text, document_desc, document_name, chunk_index, special_types)
-            chunk_index += 1
+    for i in chunks:
+        chunk, chunk_pages = i
+        data_handlers.add_chunk(db_connection, document_name, document_desc, chunk_pages, chunk_index, bucket_key, chunk)
+        find_relevances(db_connection, chunk, document_desc, document_name, chunk_index, special_types)
+        chunk_index += 1
 
 def find_relevances(client, text, text_description, document_name, chunk_no, special_types):
     relevances = []
@@ -182,7 +186,7 @@ async def upload_document(
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})
 
-    #background_tasks.add_task(os.remove, file_path)
+    background_tasks.add_task(os.remove, file_path)
 
     return {"status": "success", "document_name": document_name, "file_path": file_path}
 

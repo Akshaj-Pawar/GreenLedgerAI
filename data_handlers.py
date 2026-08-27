@@ -82,12 +82,14 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
     # from raw_text_cache: document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunks
     # from scope2_transactions: document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef
 
+    task_table_name = "scope2_transactions"
+
     query = (
         client
         .table("raw_text_cache")
-        .select("""
+        .select(f"""
             *,
-            scope2_transactions (
+            {task_table_name} (
                 *
             ),
             raw_chunk_relevances!inner (
@@ -107,7 +109,33 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
 
     if response.data:
 
-        # reference doc:
+        display_rows = []
+
+        for chunk in response.data:
+
+            transactions = chunk.pop(task_table_name, [])
+
+            if len(transactions) == 0:
+                continue
+
+            # We don't need this in the final display row
+            chunk.pop("raw_chunk_relevances", None)
+
+            for transaction in transactions:
+
+                row = {
+                    **chunk,
+                    **transaction
+                }
+
+                display_rows.append(row)
+
+        return display_rows
+    
+    else:
+        return None
+
+    # reference doc:
 
         #document_name = response.data["document_name"]
         #chunk_no_in_doc = response.data["chunk_no_in_doc"]
@@ -128,12 +156,6 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
         #bucket_key = response.data["bucket_key"]
         #chunk_contents = response.data["chunk_contents"]
         # list of many such
-
-        return response.data
-    
-    else:
-        return None
-
 
 def debug_reset_database(client):
     client.rpc("debug_reset_database").execute()

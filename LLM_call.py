@@ -241,9 +241,10 @@ def execute_task(task):
                 handler(document_name, chunk_no_in_doc, openai_client, db_connection)
 
             response = data_handlers.get_display_rows(db_connection, task, end_date=None, start_date=None)
-            if response:
+            if response is not None:
                 for rowi in range(len(response)):
                     row = flatten_dict(response[rowi], parent_key="", sep=".")
+                    chunk_contents = row.pop("chunk_contents")
                     response[rowi] = row # safe because no deletions or additions
             else:
                 response = []
