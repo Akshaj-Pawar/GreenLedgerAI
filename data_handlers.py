@@ -1,5 +1,9 @@
 from supabase import create_client
 
+# This script contains all functions that directly interact with the superbase database
+# It is called by any script that needs to interact with said database
+# in order to run any function in this script a funcitonal supabase client must alreayd exist, and be provided as input
+
 def add_chunk(client, document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunk):
     # tested
     response = client.table("raw_text_cache").upsert({

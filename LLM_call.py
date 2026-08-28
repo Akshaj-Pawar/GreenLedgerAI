@@ -14,7 +14,19 @@ load_dotenv()
 
 key = os.getenv("OPENAI_API_KEY")
 
+
+# This script manages direct interaction between the backend and the LLM api
+# When testing different models, navigate to the model = "gpt-4o-mini", section of the code and replace the model name. Analagous for anthropic models
+# There are two tasks for each function, one handling openai api calls, the other handling anthropic api calls, each task has a seperate funciton
+# this script also updates the table in the database that corresponds to the task provided
+
+
 def flatten_dict(d, parent_key="", sep="."):
+
+    # recursively flattens a dictionary contianing nested ocmponent,s creating a flat dictionary output
+    # note that it does not work on lists
+    # note also that this funciton in currently largely redundant
+
     items = {}
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
@@ -25,6 +37,14 @@ def flatten_dict(d, parent_key="", sep="."):
     return items
 
 def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection, max_attempts=1):
+
+    # given a chunk and various metadata, asks an openai model to:
+    # A) identify seperate transactions (current tests show the system is not good at this)
+    # B) for each seperate transaction extract and return a large collection of informaiton (data fields) - even lightweight models do this well
+    # also calls the model to estimate emission_factor given various bits of information
+    # uploads information to scope2_transactions
+    # extracts all relevant rows from the updated database
+
 
     chunk = data_handlers.get_chunk(db_connection, document_name, chunk_no_in_doc)
     relevance_def =  "transaction refers to an energy utility bill payment, or any such payemnt referring to the purchase of grid energy, such as would be relevant in a scope 2 emissions calculation"
@@ -214,13 +234,26 @@ def test_task_scope2_fub():
         document_name, chunk_no_in_doc = row
         task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection)
 
-def execute_task(task):
+def execute_task(task, model_family="openai"):
 
-    TASK_HANDLERS = {
+    # called by display_backend
+    # selects an appropriate function to call based on task
+    # retrieves all chunks potentially associated with the function and processes them oen by one by passing to the AI model
+    # flattens and otherwise processes repsonse rows and is repsonsibel for the bulk of error handling
+
+    OPENAI_TASK_HANDLERS = {
         "scope2_from_utility_bills": task_scope2_from_utility_bills,
         # keep updated with lists of tasks
     }
-    handler = TASK_HANDLERS.get(task)
+    ANTHROPIC_TASK_HANDLERS = {
+        "scope2_from_utility_bills": None,
+        # keep updated with lists of tasks
+    }
+
+    if model_family == "openai":
+        handler = OPENAI_TASK_HANDLERS.get(task)
+    elif model_family == "anthropic":
+        handler == ANTHROPIC_TASK_HANDLERS.get(task)
 
     if handler is None:
         results = {"success": False, "rows": None, "error": f"Unknown task: {task}"}

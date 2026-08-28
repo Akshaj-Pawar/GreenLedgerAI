@@ -5,6 +5,14 @@ from fastapi import APIRouter
 
 import LLM_call
 
+
+# This script handles the direct interaction between the tasks.html frontend page and the backend
+# Its priamry purpose is to run the LLM execute taks function using all tasks provided by the frontend, and compiling a dictionary with one entry per task
+# Each entry is represented as a seperate table on the frontend
+# It is responsible for adding a success or failure status to the backend's response, but it is not repsonsible for the format of the response dictionary, which should be flat
+# The front end is designed to flexibly work with whatever this script gives it - so it's important that it returns a flat dictionary
+
+
 router = APIRouter()
 
 class TaskRequest(BaseModel):
