@@ -1,10 +1,13 @@
 from openai import OpenAI, RateLimitError
+from anthropic import Anthropic
 import json
 import os
 import time
 import random
 from dotenv import load_dotenv
 from supabase import create_client
+from pydantic import BaseModel, Field
+from typing import Optional, List
 
 import data_handlers
 import estimation_algs
@@ -36,7 +39,7 @@ def flatten_dict(d, parent_key="", sep="."):
             items[new_key] = v
     return items
 
-def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection, max_attempts=1):
+def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection, user_id, max_attempts=1):
 
     # given a chunk and various metadata, asks an openai model to:
     # A) identify seperate transactions (current tests show the system is not good at this)
@@ -46,7 +49,7 @@ def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client
     # extracts all relevant rows from the updated database
 
 
-    chunk = data_handlers.get_chunk(db_connection, document_name, chunk_no_in_doc)
+    chunk = data_handlers.get_chunk(db_connection, document_name, chunk_no_in_doc, user_id)
     relevance_def =  "transaction refers to an energy utility bill payment, or any such payemnt referring to the purchase of grid energy, such as would be relevant in a scope 2 emissions calculation"
 
 
@@ -192,7 +195,8 @@ def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client
                     output_dict["site_postcode"], 
                     output_dict["start_date"], 
                     output_dict["end_date"], 
-                    ef
+                    ef,
+                    user_id
                 )
 
             return output["transactions"]
@@ -205,6 +209,156 @@ def task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client
             if getattr(e, "code", None) == "insufficient_quota":
                 raise RuntimeError(
                     "OpenAI API quota exhausted."
+                ) from e
+
+            # Temporary rate limit
+            if attempt == max_attempts - 1:
+                raise
+
+            delay = (2 ** attempt) + random.uniform(0, 0.5)
+
+            time.sleep(delay)
+
+
+def task_scope2_from_utility_bills_anthropic(document_name, chunk_no_in_doc, anthropic_client, db_connection, user_id, max_attempts=1):
+
+    # given a chunk and various metadata, asks an anthropic model to:
+    # A) identify seperate transactions (current tests show the system is not good at this)
+    # B) for each seperate transaction extract and return a large collection of informaiton (data fields) - even lightweight models do this well
+    # also calls the model to estimate emission_factor given various bits of information
+    # uploads information to scope2_transactions
+    # extracts all relevant rows from the updated database
+
+
+    chunk = data_handlers.get_chunk(db_connection, document_name, chunk_no_in_doc)
+    relevance_def =  "transaction refers to an energy utility bill payment, or any such payemnt referring to the purchase of grid energy, such as would be relevant in a scope 2 emissions calculation"
+
+
+    prompt = f'''
+    Examine the supplied text chunk and for every distinct transaction:
+    A) Consider its relevance to the task. 
+    A transaction is relevant if: {relevance_def}.
+    A transaction is relevant only when the text records that the transaction actually occurred. Mentions of planned, expected, scheduled, hypothetical, cancelled, or requested transactions do not count.
+    B) If and only if the transaction appears relevant to the task, extract the information available in the transaction record into the appropriate fields. 
+    If no information can be found for a given field, set as null
+    Do not infer or invent information that is not supported by the text, your role is strictly data extraction from the chunk, not to offer speculations on uncertainties
+    Treat each distinct transaction separately, even when multiple transactions occur in the same paragraph or sentence.
+    If there are no relevant transactions in the chunk, return an empty transactions array
+
+    The text you are to analyse begins here: {chunk}
+    '''
+
+    for attempt in range(max_attempts):
+
+        print("CALLING API")
+
+        try:
+
+            class Transaction(BaseModel):
+                description: str = Field(
+                    description="A short description of the transaction, e.g. 'utility bill payment' or 'salary payment'."
+                )
+                date: Optional[str] = Field(
+                    default=None,
+                    description="The transaction date as explicitly stated in the text (year, month, day format). Null if no transaction date can be established."
+                )
+                merchant_name: Optional[str] = Field(
+                    default=None, description="The merchant, payee, or other counterparty if explicitly identifiable."
+                )
+                product: Optional[str] = Field(
+                    default=None, description="The product being purchased in the transaction, as stated in the transaction."
+                )
+                cost: Optional[float] = Field(
+                    default=None, description="The monetary cost of the transaction. Do not infer an amount that is not present in the text."
+                )
+                currency: Optional[str] = Field(
+                    default=None, description="The currency of the transaction, preferably as an ISO 4217 code such as GBP or USD."
+                )
+                kwhs: Optional[float] = Field(
+                    default=None, description="The number of kwhs of energy purchased in the given transaction."
+                )
+                site_name: Optional[str] = Field(
+                    default=None, description="The name of the building or site that is being billed."
+                )
+                site_location_city: Optional[str] = Field(
+                    default=None, description="The last line of the address of the building or site that is being billed."
+                )
+                site_postcode: Optional[str] = Field(
+                    default=None, description="The postcode of the building or site that is being billed."
+                )
+                start_date: Optional[str] = Field(
+                    default=None, description="For subscription services or utility payments: date at which the billing period covered by the payment record begins."
+                )
+                end_date: Optional[str] = Field(
+                    default=None, description="For subscription services or utility payments: date at which the billing period covered by the payment record ends."
+                )
+
+            class TransactionExtraction(BaseModel):
+                transactions: List[Transaction]
+
+            response = anthropic_client.messages.parse(
+                model="claude-haiku-4-5-20251001",  # cheap/fast tier, roughly the gpt-4o-mini equivalent
+                # model="claude-sonnet-5",           # swap in if you need higher accuracy on messy statements
+                max_tokens=4096,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                output_format=TransactionExtraction,
+            )
+
+            result = response.parsed_output  # a TransactionExtraction instance
+            transactions = result.transactions
+
+            print(transactions)
+
+            # unpack JSON into output rows
+
+            for t in transactions:
+                output_obj = t
+
+                # placeholder dummy funciton always returns 1
+                ef = estimation_algs.scope2_fub_get_ef(
+                    output_obj.site_location_city, 
+                    output_obj.site_postcode, 
+                    output_obj.merchant_name, 
+                    output_obj.product, 
+                    output_obj.cost, 
+                    output_obj.currency, 
+                    output_obj.start_date, 
+                    output_obj.end_date
+                )
+
+                # add to a postgres d
+                data_handlers.add_scope2_transaction_row(
+                    db_connection, 
+                    document_name, 
+                    chunk_no_in_doc, 
+                    output_obj.merchant_name, 
+                    output_obj.date, 
+                    output_obj.product, 
+                    output_obj.cost, 
+                    output_obj.currency, 
+                    output_obj.site_name, 
+                    output_obj.site_location_city, 
+                    output_obj.site_postcode, 
+                    output_obj.start_date, 
+                    output_obj.end_date, 
+                    ef
+                )
+
+            return transactions.model_dump()   # converts to dictionary for easy and regular testing
+
+        except RateLimitError as e:
+
+            print("RATE LIMIT ERROR")
+
+            # Do NOT retry exhausted quota
+            if getattr(e, "code", None) == "insufficient_quota":
+                raise RuntimeError(
+                    "Anthropic API quota exhausted."
                 ) from e
 
             # Temporary rate limit
@@ -234,7 +388,7 @@ def test_task_scope2_fub():
         document_name, chunk_no_in_doc = row
         task_scope2_from_utility_bills(document_name, chunk_no_in_doc, openai_client, db_connection)
 
-def execute_task(task, model_family="openai"):
+def execute_task(task, user_id, model_family="openai"):
 
     # called by display_backend
     # selects an appropriate function to call based on task
@@ -246,14 +400,16 @@ def execute_task(task, model_family="openai"):
         # keep updated with lists of tasks
     }
     ANTHROPIC_TASK_HANDLERS = {
-        "scope2_from_utility_bills": None,
+        "scope2_from_utility_bills": task_scope2_from_utility_bills_anthropic,
         # keep updated with lists of tasks
     }
 
     if model_family == "openai":
         handler = OPENAI_TASK_HANDLERS.get(task)
+        llm_client = OpenAI()
     elif model_family == "anthropic":
         handler == ANTHROPIC_TASK_HANDLERS.get(task)
+        llm_client = Anthropic()
 
     if handler is None:
         results = {"success": False, "rows": None, "error": f"Unknown task: {task}"}
@@ -266,14 +422,13 @@ def execute_task(task, model_family="openai"):
                 sb_url,
                 sb_key
             )
-            openai_client = OpenAI()
 
-            chunk_pks = data_handlers.get_chunk_ids(db_connection, task)
+            chunk_pks = data_handlers.get_chunk_ids(db_connection, task, user_id)
             for row in chunk_pks:
                 document_name, chunk_no_in_doc = row
-                handler(document_name, chunk_no_in_doc, openai_client, db_connection)
+                handler(document_name, chunk_no_in_doc, llm_client, db_connection, user_id)
 
-            response = data_handlers.get_display_rows(db_connection, task, end_date=None, start_date=None)
+            response = data_handlers.get_display_rows(db_connection, task, user_id, end_date=None, start_date=None)
             if response is not None:
                 for rowi in range(len(response)):
                     row = flatten_dict(response[rowi], parent_key="", sep=".")

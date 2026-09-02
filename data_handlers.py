@@ -4,9 +4,27 @@ from supabase import create_client
 # It is called by any script that needs to interact with said database
 # in order to run any function in this script a funcitonal supabase client must alreayd exist, and be provided as input
 
-def add_chunk(client, document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunk):
+def get_documents_for_user(client, user_id):
+    response = (
+        client
+        .table("raw_text_cache")
+        .select("document_name")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    seen = set()
+    unique_rows = []
+    for row in response.data:
+        if row["document_name"] not in seen:
+            seen.add(row["document_name"])
+            unique_rows.append(row)
+
+    return {"documents": unique_rows}
+
+def add_chunk(client, document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunk, user_id):
     # tested
     response = client.table("raw_text_cache").upsert({
+        "user_id": user_id,
         "document_name": document_name,
         "document_description": document_desc,
         "page_no": page_no,
@@ -17,7 +35,7 @@ def add_chunk(client, document_name, document_desc, page_no, chunk_no_in_doc, bu
     return response
 
 
-def get_chunk(client, document_name, chunk_no_in_doc):
+def get_chunk(client, document_name, chunk_no_in_doc, user_id):
     # tested
     response = (
         client
@@ -25,6 +43,7 @@ def get_chunk(client, document_name, chunk_no_in_doc):
         .select("chunk_contents")
         .eq("document_name", document_name)
         .eq("chunk_no_in_doc", chunk_no_in_doc)
+        .eq("user_id", user_id)
         .execute()
     )
 
@@ -34,9 +53,10 @@ def get_chunk(client, document_name, chunk_no_in_doc):
         return None
 
 
-def add_relevancy_to_chunk(client, document_name, chunk_no_in_doc, task_name):
+def add_relevancy_to_chunk(client, document_name, chunk_no_in_doc, task_name, user_id):
 
     response = client.table("raw_chunk_relevances").upsert({
+        "user_id": user_id,
         "document_name": document_name,
         "chunk_no_in_doc": chunk_no_in_doc,
         "task_name": task_name,
@@ -44,13 +64,14 @@ def add_relevancy_to_chunk(client, document_name, chunk_no_in_doc, task_name):
     return response
 
 
-def get_chunk_ids(client, task_name):
+def get_chunk_ids(client, task_name, user_id):
     # return document names and chunk_no_in_doc for all chunks relevant to task
     response = (
         client
         .table("raw_chunk_relevances")
         .select("document_name, chunk_no_in_doc")
         .eq("task_name", task_name)
+        .eq("user_id", user_id)
         .execute()
     )
 
@@ -63,10 +84,11 @@ def get_chunk_ids(client, task_name):
         return []
     
 
-def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef):
+def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef, user_id):
     response = client.table("scope2_transactions").upsert({
         "document_name": document_name,
         "chunk_no_in_doc": chunk_no_in_doc,
+        "user_id": user_id,
         "merchant_name": merchant_name,
         "date_of_payment": date,
         "product": product,
@@ -82,7 +104,7 @@ def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_
     return response
 
 
-def get_display_rows(client, task_name, end_date=None, start_date=None):
+def get_display_rows(client, task_name, user_id, end_date=None, start_date=None):
     # from raw_text_cache: document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunks
     # from scope2_transactions: document_name, chunk_no_in_doc, merchant_name, date, product, cost, currency, site_name, site_location_city, site_postcode, start_date, end_date, ef
 
@@ -102,6 +124,7 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
             )
         """)
         .eq("raw_chunk_relevances.task_name", task_name)
+        .eq("user_id", user_id)
     )
 
     if start_date is not None:
@@ -133,6 +156,7 @@ def get_display_rows(client, task_name, end_date=None, start_date=None):
                 # Remove fields we don't want in the display row
                 row.pop(task_table_name, None)
                 row.pop("raw_chunk_relevances", None)
+                row.pop("user_id", None)
 
                 display_rows.append(row)
 

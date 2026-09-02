@@ -1,33 +1,39 @@
-# Week One
+# List of Bugs:
+# Does not automatically redirect to sign in
+# relevancy add to chunk bug
+# The button to move to the next page (tasks.html) does not work, and disappears after a failed upload
+# tasks.html does not correctly conclude that no documents are uploaded, other functionality cannot be tested yet, because documents aren't being properly uploaded
+# whether or not sign in works is unclear, can only be tested once documents are properly uploaded
 
-# document scripts and functions
-# send demo
-# integrate tests - delegate
-# test on different models and come to final test idea - delegate
+# commit and document changes
 
-# add a claude version
-# users as primary key in initial cache
-# retest with claude
-
-# table should show chunks when asked to, and redirect to edit when asked to
-# back button and switch from automatic redirect to button based redirect
-# final archive phase and reset afterwards - send the user some sql files, clean the users cache (possibly)
-
-
-# Week 2+3
-
-# test archiving, implement retrieving from the 3 bucket archive, with restricted access
-# accessing archived documents frontend
+# final archive phase - send the user some sql files
+# table should redirect to edit when asked to, which shows chunks
 # reviewer ux: override row
+# reset button: clean the users cache (possibly)
+# test
+
+# add sign in to the other project + debug
+
 
 # find an even better form of chunking, don't send out the whole thing at once, may require intelligent merging
 # add and test vectorisation layer
+
+# test archiving, implement retrieving from the 3 bucket archive, with restricted access
+# accessing archived documents frontend
+# add option to first page for uploading archived documents
+
+# docker everything
 # human review chunking?
 
 # new functionality to task:
 # scope 1 / 2 / 3
 # product intelligence + lifecycle intelligence
 # IOT ingestion and processing
+
+# integrate tests - delegate
+# test on different models and come to final test idea - delegate
+
 
 
 # Later tasks
@@ -40,3 +46,6 @@
 # explore adding async to handler and in general
 # best practices for human in the loop
 # apply any new skills you learn
+
+
+curl http://localhost:8000/tasks -H "Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6IjM1ZmY0NDg1LWMxMTgtNGUyOC1hZTg0LTBjMjA1ZDZkMjc2ZSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3h5bWxic2hvYXhwdGVxb3BueXFxLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI4Zjk2NWJkNS1mZjdlLTRmZWQtODUzNi0xNDQ5OGVhY2VjZjIiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzg4MjE4NzYwLCJpYXQiOjE3ODgyMTUxNjAsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzg4MjE1MTYwfV0sInNlc3Npb25faWQiOiIzNzU2ODEzYy0zODFkLTQyMDEtYTE1NC0xMDZiMDkwNGE1NzUiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.vzgCZmQvOkfkdOQO_bVcCZZhVGVZOXN49A-DzuSNYd9TizbUoOuCnhT38edpx5KCotaGPJ-WBprX8MxQBeBFIA"

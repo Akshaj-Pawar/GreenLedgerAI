@@ -37,3 +37,13 @@ To start:
 6. Run Command: uvicorn main:app --reload
 
 7. Follow the link in the terminal
+
+
+To test the sign in / sign up: 
+curl -X POST 'https://<SUPABASE_URL>.supabase.co/auth/v1/token?grant_type=password' \
+  -H "apikey: <supabase-anon-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"testpassword"}'
+
+And then (where access token is the output of the previous): 
+curl http://localhost:8000/documents -H "Authorization: Bearer <access_token>"

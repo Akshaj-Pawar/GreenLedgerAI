@@ -7,12 +7,14 @@ import tempfile
 import asyncio
 from supabase import create_client
 from pypdf import PdfReader
-from fastapi import APIRouter, Form, File, UploadFile, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Form, File, UploadFile, BackgroundTasks, HTTPException, Depends
 from starlette.concurrency import run_in_threadpool
 from typing import List
 import re
 
 import data_handlers
+import user_verifier
+
 
 load_dotenv()
 s3 = boto3.client("s3")
@@ -37,64 +39,6 @@ def archive_pdf(pdf_path: str, document_id: str, document_name: str, description
     Returns:
         (bucket, key)
     """
-
-    key = f"documents/{document_id}/original.pdf"
-
-    s3.upload_file(
-        pdf_path,
-        bucket,
-        key,
-        ExtraArgs={
-            "ContentType": "application/pdf"
-        }
-    )
-
-    return bucket, key
-
-def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, special_types: list[str], db_connection, bucket, bucket_key):
-
-    # Parse a PDF and store its text chunks in PostgreSQL.
-
-    reader = PdfReader(pdf_path) # object that can read pdfs
-
-    chunk_index = 0
-
-    chunks = [["", []]]
-
-    for page_number, page in enumerate(reader.pages, start=1):
-        # this currently chunks by page which is not the best strategy long term
-
-        text = page.extract_text()
-
-        if not text:
-            continue
-
-        # Placeholder chunking strategy for now.
-        # This can later be replaced by a proper chunker.
-        chunks[0][0] += text + "\n"
-        chunks[0][1].append(page_number)
-
-    for i in chunks:
-        chunk, chunk_pages = i
-        data_handlers.add_chunk(db_connection, document_name, document_desc, chunk_pages, chunk_index, bucket_key, chunk)
-        find_relevances(db_connection, chunk, document_desc, document_name, chunk_index, special_types)
-        chunk_index += 1
-
-def find_relevances(client, text, text_description, document_name, chunk_no, special_types):
-
-    # algorithmically idenitfies tasks a chunk may be associated wiht / useful for 
-    # and adds that relevancy to the supabase database
-
-    relevances = []
-    if "utility_bill" in special_types:
-        relevances.append("scope2_from_utility_bills")
-        data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_name="scope2_from_utility_bills")
-    # etc etc
-
-def main_orchestrator(pdf_path, document_name, description, special_types):
-
-    document_id = str(uuid.uuid4()) # may be different to the supabase uuid
-
     # create bucket
     s3session = boto3.Session(
         aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
@@ -121,6 +65,64 @@ def main_orchestrator(pdf_path, document_name, description, special_types):
         "Name": bucket_name
     }
 
+    key = f"documents/{document_id}/original.pdf"
+
+    s3.upload_file(
+        pdf_path,
+        bucket,
+        key,
+        ExtraArgs={
+            "ContentType": "application/pdf"
+        }
+    )
+
+    return bucket, key
+
+def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, special_types: list[str], db_connection, bucket_key, user_id: str):
+
+    # Parse a PDF and store its text chunks in PostgreSQL.
+
+    reader = PdfReader(pdf_path) # object that can read pdfs
+
+    chunk_index = 0
+
+    chunks = [["", []]]
+
+    for page_number, page in enumerate(reader.pages, start=1):
+        # this currently chunks by page which is not the best strategy long term
+
+        text = page.extract_text()
+
+        if not text:
+            continue
+
+        # Placeholder chunking strategy for now.
+        # This can later be replaced by a proper chunker.
+        chunks[0][0] += text + "\n"
+        chunks[0][1].append(page_number)
+
+    for i in chunks:
+        chunk, chunk_pages = i
+        data_handlers.add_chunk(db_connection, document_name, document_desc, chunk_pages, chunk_index, bucket_key, chunk, user_id)
+        find_relevances(db_connection, chunk, document_desc, document_name, chunk_index, special_types, user_id)
+        chunk_index += 1
+
+def find_relevances(client, text, text_description, document_name, chunk_no, special_types, user_id):
+
+    # algorithmically idenitfies tasks a chunk may be associated wiht / useful for 
+    # and adds that relevancy to the supabase database
+
+    relevances = []
+    if "utility_bill" in special_types:
+        task_name = "scope2_from_utility_bills"
+        relevances.append(task_name)
+        data_handlers.add_relevancy_to_chunk(client, document_name, chunk_no, task_name, user_id)
+    # etc etc
+
+def main_orchestrator(pdf_path, document_name, description, special_types, user_id):
+
+    document_id = str(uuid.uuid4()) # may be different to the supabase uuid
+
     # to be implemented later:
     # bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
     bucket_key = "" # placeholder
@@ -134,7 +136,7 @@ def main_orchestrator(pdf_path, document_name, description, special_types):
         sb_key
     )
 
-    parse_pdf_to_chunks(pdf_path, document_name, description, special_types, db_connection, bucket, bucket_key)
+    parse_pdf_to_chunks(pdf_path, document_name, description, special_types, db_connection, bucket_key, user_id)
 
 
 @router.post("/documents")
@@ -143,8 +145,11 @@ async def upload_document(
     document_name: str = Form(...),
     description: str = Form(...), 
     file: UploadFile = File(...),
-    special_types: List[str] = Form([])
+    special_types: List[str] = Form([]),
+    user_id: str = Depends(user_verifier.get_current_user)
     ):
+
+    print("PARSER REACHED")
 
     # FastAPI application functions
 
@@ -160,11 +165,13 @@ async def upload_document(
 
         document_name =  f"{document_name}_{os.path.basename(file_path)}"
 
-    await run_in_threadpool(main_orchestrator, file_path, document_name, description, special_types)
+        print("FILE UPLOADED")
+
+    await run_in_threadpool(main_orchestrator, file_path, document_name, description, special_types, user_id)
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})
 
-    background_tasks.add_task(os.remove, file_path)
+    #background_tasks.add_task(os.remove, file_path)
 
     return {"status": "success", "document_name": document_name, "file_path": file_path}
 

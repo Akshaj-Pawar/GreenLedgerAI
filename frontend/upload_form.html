@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Upload Document</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; color: #222; }
   h1 { font-size: 1.3rem; }
@@ -50,22 +51,63 @@
   </div>
 
   <button type="submit" id="submit-btn">Upload</button>
+  <button type="button" id="tasks-btn">
+    Continue to Task Selection
+  </button>
   <div id="status"></div>
 
 </form>
  
 <script>
+  const SUPABASE_URL = "https://xymlbshoaxpteqopnyqq.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_1veoUrBqOnvgMyxTlOYyPg_VIdEPzrX";
+
+  const { createClient } = supabase; // supabase-js exposes a global "supabase" object
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // If already signed in (e.g. returning visitor with a valid stored
+  // session), skip straight to the app instead of showing this form.
+  async function getAccessToken() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (!data.session) {
+      // No valid session -- send the user to sign in, since every
+      // request from this page needs a token attached.
+      window.location.href = "sign-in.html";
+      return null;
+    }
+    return data.session.access_token;
+  }
+
+  async function checkSession() {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
+  }
+  checkSession()
+
   // Grab the form element and listen for its "submit" event.
   const form = document.getElementById("upload-form");
   const statusEl = document.getElementById("status");
   const submitBtn = document.getElementById("submit-btn");
- 
+  const tasksBtn = document.getElementById("tasks-btn");
+
+  let uploadedDocumentName = null;
+  let uploadedFilePath = null;
+  
+  // Only redirect when the user explicitly clicks the corresponding button.
+  tasksBtn.addEventListener("click", () => {
+    window.location.href = "tasks.html"
+  });
+
   form.addEventListener("submit", async (event) => {
     // Stop the browser from doing its default full-page-reload form submission.
     // We want to send this ourselves with fetch() instead.
     event.preventDefault();
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
  
     submitBtn.disabled = true;
+    //tasksBtn.disabled = true;
     statusEl.textContent = "Uploading...";
  
     // FormData automatically matches how FastAPI's Form(...) and File(...)
@@ -91,8 +133,12 @@
       // async functions in JS: other things can keep running while we wait.
       const response = await fetch("/documents", {
         method: "POST",
+        headers: {
+          //"Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
         body: formData
-        // No Content-Type header set on purpose — the browser sets the
+        // No Content-Type header set on purpose — the browser sets the 
         // correct multipart boundary automatically when body is FormData.
       });
  
@@ -101,20 +147,21 @@
       }
  
       const data = await response.json();
+
+      uploadedDocumentName = data.document_name;
+      uploadedFilePath = data.file_path;
+
       statusEl.textContent = `Success: ${data.document_name} uploaded.`;
 
-      // Redirect to the tasks page, passing along the identifiers it needs.
-      const params = new URLSearchParams({
-      document_name: data.document_name,
-      file_path: data.file_path
-      });
-      window.location.href = `tasks.html?${params.toString()}`;
+      form.reset();
 
     } catch (err) {
       statusEl.textContent = `Upload failed: ${err.message}`;
     } finally {
       submitBtn.disabled = false;
+      //tasksBtn.disabled = false;
     }
+
   });
 </script>
  

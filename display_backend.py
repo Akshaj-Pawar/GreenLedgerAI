@@ -1,10 +1,17 @@
 from pydantic import BaseModel
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from supabase import create_client
+
+import os
+from dotenv import load_dotenv
 
 import LLM_call
+import user_verifier
+import data_handlers
 
+load_dotenv()
 
 # This script handles the direct interaction between the tasks.html frontend page and the backend
 # Its priamry purpose is to run the LLM execute taks function using all tasks provided by the frontend, and compiling a dictionary with one entry per task
@@ -12,16 +19,29 @@ import LLM_call
 # It is responsible for adding a success or failure status to the backend's response, but it is not repsonsible for the format of the response dictionary, which should be flat
 # The front end is designed to flexibly work with whatever this script gives it - so it's important that it returns a flat dictionary
 
-
 router = APIRouter()
 
 class TaskRequest(BaseModel):
-    document_name: str
-    file_path: str
+    #document_name: str
+    #file_path: str
     tasks: List[str]
 
+@router.get("/tasks")
+async def list_documents(user_id: str = Depends(user_verifier.get_current_user)):
+
+    sb_url = os.getenv("SUPABASE_URL")
+    sb_key = os.getenv("SUPABASE_ADMIN_KEY")
+
+    db_connection = create_client(
+        sb_url,
+        sb_key
+    )
+
+    response = data_handlers.get_documents_for_user(db_connection, user_id)
+    return response
+
 @router.post("/tasks")
-async def run_tasks(payload: TaskRequest):
+async def run_tasks(payload: TaskRequest, user_id: str = Depends(user_verifier.get_current_user)):
     print(payload)
     # payload.document_name, payload.file_path, payload.tasks are now
     # validated and typed -- FastAPI parses the JSON body against
@@ -37,6 +57,6 @@ async def run_tasks(payload: TaskRequest):
         # results[task] = {"success": True, "rows": [{"col_A": 5, "col_B": 7, "col_C": 9}], "error": None}
 
         # production code - comment out when testing
-        results[task] = LLM_call.execute_task(task) # returns eg: {"success": True, "results": response, "error": None}
+        results[task] = LLM_call.execute_task(task, user_id, model_family="openai") # returns eg: {"success": True, "results": response, "error": None}
 
     return {"status": "success", "results": results}

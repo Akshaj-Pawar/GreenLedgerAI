@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Select Tasks</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"> // new content </script>
 <style>
   body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; color: #222; }
   h1 { font-size: 1.3rem; }
@@ -30,6 +31,8 @@
 </style>
 </head>
 <body>
+
+<button type="button" id="back-btn">Back to upload</button>
  
 <h1>Select tasks to run</h1>
 <div id="doc-info">Loading document info...</div>
@@ -63,24 +66,68 @@
 </div>
  
 <script>
-  // Read document_name and file_path that were passed in via the URL
+
+  // check for sign in and redirect if not
+
+  const SUPABASE_URL = "https://xymlbshoaxpteqopnyqq.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_1veoUrBqOnvgMyxTlOYyPg_VIdEPzrX";
+
+  const { createClient } = supabase; // supabase-js exposes a global "supabase" object
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // If already signed in (e.g. returning visitor with a valid stored
+  // session), skip straight to the app instead of showing this form.
+  async function getAccessToken() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (!data.session) {
+      // No valid session -- send the user to sign in, since every
+      // request from this page needs a token attached.
+      window.location.href = "sign-in.html";
+      return null;
+    }
+    return data.session.access_token;
+  }
+
   // when this page was redirected to from the upload page.
   const params = new URLSearchParams(window.location.search);
-  const documentName = params.get("document_name");
-  const filePath = params.get("file_path");
- 
-  const docInfo = document.getElementById("doc-info");
-  docInfo.textContent = documentName
-    ? `Document: ${documentName}`
-    : "No document reference found — go back and upload a document first.";
- 
+  const documentListEl = document.getElementById("doc-info"); // no style element matching this
   const form = document.getElementById("tasks-form");
   const statusEl = document.getElementById("status");
   const submitBtn = document.getElementById("submit-btn");
   const resultsDisplay = document.getElementById("results-display");
+
+  async function loadDocuments() {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return; // already redirecting to auth.html
+ 
+    try {
+      const response = await fetch("/documents", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${accessToken}` }
+      });
+ 
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+ 
+      const data = await response.json();
+
+      documentListEl.textContent = documentName
+        ? `Document: ${data.documents.map(doc => doc.document_name).join(", ")}`
+        : "No document reference found — go back and upload a document first.";
+
+      renderDocumentList(data.documents);
+
+    } catch (err) {
+      documentListEl.textContent = `Failed to load documents: ${err.message}`;
+    }
+  }
  
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
  
     // Collect all checked task checkboxes into an array of their values.
     const selectedTasks = Array.from(
@@ -98,10 +145,11 @@
     try {
       const response = await fetch("/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
         body: JSON.stringify({
-          document_name: documentName,
-          file_path: filePath,
           tasks: selectedTasks
         })
       });
@@ -122,6 +170,8 @@
       submitBtn.disabled = false;
     }
   });
+
+  loadDocuments()
  
   // Human-readable labels for task keys -- extend this as you add tasks.
   const TASK_LABELS = {
@@ -227,6 +277,10 @@
  
     return table;
   }
+
+  document.getElementById("back-btn").addEventListener("click", () => {
+    window.location.href = "upload_form.html";
+  });
 </script>
  
 </body>

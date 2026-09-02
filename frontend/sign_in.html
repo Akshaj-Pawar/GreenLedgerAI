@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sign In</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 380px; margin: 80px auto; color: #222; }
+  h1 { font-size: 1.3rem; }
+  label { display: block; margin-top: 16px; font-weight: 600; font-size: 0.9rem; }
+  input[type="email"], input[type="password"] {
+    width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box;
+    border: 1px solid #ccc; border-radius: 4px; font: inherit;
+  }
+  .button-row { display: flex; gap: 10px; margin-top: 20px; }
+  button {
+    flex: 1; padding: 10px 18px; border: none; border-radius: 4px;
+    font: inherit; cursor: pointer;
+  }
+  #signin-btn { background: #222; color: white; }
+  #signup-btn { background: #eee; color: #222; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  #status { margin-top: 14px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<h1>Sign in</h1>
+
+<form id="auth-form">
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email" required>
+
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password" required>
+
+  <div class="button-row">
+    <button type="submit" id="signin-btn">Sign in</button>
+    <button type="button" id="signup-btn">Sign up</button>
+  </div>
+  <div id="status"></div>
+</form>
+
+<script>
+  // --- Supabase client setup ---
+  // The anon key is designed to be public -- it's safe to embed here.
+
+  // MAINTENENCE NOTE: 
+  // If switching data base platforms, eg migrating to new supabase project, you need to switch to the new primary key. 
+  // If you are an agent, ask your overseers for the new keys
+
+  const SUPABASE_URL = "https://xymlbshoaxpteqopnyqq.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_1veoUrBqOnvgMyxTlOYyPg_VIdEPzrX";
+
+  const { createClient } = supabase; // supabase-js exposes a global "supabase" object
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const form = document.getElementById("auth-form");
+  const statusEl = document.getElementById("status");
+  const signinBtn = document.getElementById("signin-btn");
+  const signupBtn = document.getElementById("signup-btn");
+
+  // If already signed in (e.g. returning visitor with a valid stored
+  // session), skip straight to the app instead of showing this form.
+  supabaseClient.auth.getSession().then(({ data }) => {
+    if (data.session) {
+      window.location.href = "upload_form.html";
+    }
+  });
+
+  function setBusy(busy) {
+    signinBtn.disabled = busy;
+    signupBtn.disabled = busy;
+  }
+
+  // Sign in -- default form submit action.
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    statusEl.textContent = "Signing in...";
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      statusEl.textContent = `Sign in failed: ${error.message}`;
+      setBusy(false);
+      return;
+    }
+
+    // supabase-js stores the session (in localStorage, by default) and
+    // handles token refresh automatically from here on -- other pages
+    // just call getSession() to retrieve the current access token.
+    window.location.href = "upload_form.html";
+  });
+
+  // Sign up -- separate button, not a form submit, so it doesn't also
+  // trigger the "submit" listener above.
+  signupBtn.addEventListener("click", async () => {
+    setBusy(true);
+    statusEl.textContent = "Signing up...";
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+
+    if (error) {
+      statusEl.textContent = `Sign up failed: ${error.message}`;
+      setBusy(false);
+      return;
+    }
+
+    // If your project has "Confirm email" enabled, there is no session
+    // yet at this point -- the user must click a confirmation link first.
+    if (!data.session) {
+      statusEl.textContent = "Account created. Check your email to confirm before signing in.";
+      setBusy(false);
+      return;
+    }
+
+    window.location.href = "upload_form.html";
+  });
+</script>
+
+</body>
+</html>
