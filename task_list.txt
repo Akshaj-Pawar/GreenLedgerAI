@@ -1,35 +1,24 @@
-# List of Bugs:
-# Does not automatically redirect to sign in
-# relevancy add to chunk bug
-# The button to move to the next page (tasks.html) does not work, and disappears after a failed upload
-# tasks.html does not correctly conclude that no documents are uploaded, other functionality cannot be tested yet, because documents aren't being properly uploaded
-# whether or not sign in works is unclear, can only be tested once documents are properly uploaded
 
-# commit and document changes
+# saving into 3 bucket archive does not work
+# implement retrieving from the 3 bucket archive, with restricted access
+# accessing archived documents frontend (upload_form)
 
-# final archive phase - send the user some sql files
-# table should redirect to edit when asked to, which shows chunks
-# reviewer ux: override row
-# reset button: clean the users cache (possibly)
-# test
+# test and debug the new download buttons
 
-# add sign in to the other project + debug
-
-
+# add all of scope 1 / 2 / 3
 # find an even better form of chunking, don't send out the whole thing at once, may require intelligent merging
 # add and test vectorisation layer
-
-# test archiving, implement retrieving from the 3 bucket archive, with restricted access
-# accessing archived documents frontend
-# add option to first page for uploading archived documents
-
-# docker everything
 # human review chunking?
 
 # new functionality to task:
-# scope 1 / 2 / 3
 # product intelligence + lifecycle intelligence
 # IOT ingestion and processing
+
+# table should redirect to edit when asked to, which shows chunks
+# reviewer ux: override row
+# reset button: clean the users cache (possibly)
+# docker everything
+# test
 
 # integrate tests - delegate
 # test on different models and come to final test idea - delegate
