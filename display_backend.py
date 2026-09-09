@@ -104,10 +104,11 @@ async def run_tasks(payload: TaskRequest, user_id: str = Depends(user_verifier.g
         # function actually performs each task against payload.file_path
 
         # test to see if frontend will work - comment out in deeper tests and production
-        # results[task] = {"success": True, "rows": [{"col_A": 5, "col_B": 7, "col_C": 9}], "error": None}
+        results[task] = {"success": True, "rows": [{"col_A": 5, "col_B": 7, "col_C": 9}], "error": None}
 
         # production code - comment out when testing
-        results[task] = LLM_call.execute_task(task, user_id, model_family="openai") # returns eg: {"success": True, "results": response, "error": None}
+        #results[task] = LLM_call.execute_task(task, user_id, model_family="openai") # returns eg: {"success": True, "results": response, "error": None}
+        
         user_recent_results_cache[user_id] = results
 
     return {"status": "success", "results": results}

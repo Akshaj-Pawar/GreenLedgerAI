@@ -9,8 +9,11 @@ from supabase import create_client
 from pypdf import PdfReader
 from fastapi import APIRouter, Form, File, UploadFile, BackgroundTasks, HTTPException, Depends
 from starlette.concurrency import run_in_threadpool
-from typing import List
+from typing import List, Tuple
+from datetime import datetime, timezone
 import re
+import json
+from pydantic import BaseModel
 
 import data_handlers
 import user_verifier
@@ -31,13 +34,154 @@ router = APIRouter()
 # chunks are filtered and associated with tasks they seem useful for. This is currently done 
 # algorithmically based on the special types the user provides
 
+def retrieve_archived_document(bucket_key: str, s3client):
+    """
+    Retrieve an archived document from S3.
 
-def archive_pdf(pdf_path: str, document_id: str, document_name: str, description: str, special_types: list[str], bucket: str) -> tuple[str, str]:
+    Downloads the PDF to a temporary local file and retrieves
+    the associated metadata.
+
+    Returns:
+        (metadata, local_file_path)
+    """
+
+    bucket_name = os.getenv("AWS_S3_BUCKET")
+    local_path = os.getenv("CACHE_PATH")
+    if not bucket_name:
+        raise RuntimeError("AWS_S3_BUCKET is not configured")
+    
+    # The archive function stores these two objects under bucket_key.
+    file_key = f"{bucket_key}/contents.pdf"
+    meta_key = f"{bucket_key}/meta.json"
+
+    # Retrieve metadata
+    response = s3client.get_object(
+        Bucket=bucket_name,
+        Key=meta_key,
+    )
+
+    metadata = json.loads(
+        response["Body"].read().decode("utf-8")
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, dir=local_path) as tmp:
+        local_file_path = tmp.name
+    
+    response = s3client.download_file(
+        bucket_name,
+        file_key,
+        local_file_path,
+    )
+
+    document_name = metadata["document_name"]
+    description = metadata["description"]
+    special_types = metadata["special-types"]
+
+    return local_file_path, description, special_types
+
+@router.get("/documents/archived/list")
+async def list_documents_in_archived_folder(
+    user_id: str = Depends(user_verifier.get_current_user),
+):
+    """
+    List all documents that are both archived and not currently cached
+    """
+
+    bucket_name = os.getenv("AWS_S3_BUCKET")
+
+    s3session = boto3.Session(
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION", "eu-west-2")
+    )
+
+    s3client = s3session.client("s3")
+
+    prefix = f"{user_id}/"
+
+    paginator = s3client.get_paginator("list_objects_v2")
+
+    items = []
+
+    for page in paginator.paginate(
+        Bucket=bucket_name,
+        Prefix=prefix,
+    ):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+
+            if not key.endswith("/meta.json"):
+                continue
+
+            bucket_key = key[:-len("meta.json")]
+
+            # Remove the user's prefix and trailing slash.
+            document_folder = bucket_key[len(prefix):-1]
+
+            # Split the folder into document name and timestamp.
+            document_name, timestamp = document_folder.rsplit("_", 1)
+
+            items.append({
+                #"bucket_key": bucket_key,
+                "document_name": document_name,
+                "timestamp": timestamp,
+            })
+
+    # sort by reverse chronological order
+    items.sort(key=lambda x: x["timestamp"], reverse=True)
+    return {"status": "success", "documents": items}
+
+class ArchivedDocRef(BaseModel):
+    document_name: str
+    timestamp: str
+
+class ArchivedUploadRequest(BaseModel):
+    documents: List[ArchivedDocRef]
+
+@router.post("/documents/archived/upload")
+async def upload_archived_documents(
+        background_tasks: BackgroundTasks, 
+        payload: ArchivedUploadRequest,
+        user_id: str = Depends(user_verifier.get_current_user),
+    ):
+
+    s3session = boto3.Session(
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION", "eu-west-2")
+    )
+
+    s3client = s3session.client("s3")
+
+    sb_url = os.getenv("SUPABASE_URL")
+    sb_key = os.getenv("SUPABASE_ADMIN_KEY")
+
+    db_connection = create_client(
+        sb_url,
+        sb_key
+    )
+
+    for doc_ref in payload.documents:
+        document_name, timestamp = doc_ref.document_name, doc_ref.timestamp
+
+        if "/" in document_name: 
+            raise HTTPException(400, ...)
+        else:
+            # reconstruct key
+            bucket_key = f"{user_id}/{document_name}_{timestamp}/"
+            file_path, description, special_types = retrieve_archived_document(bucket_key, s3client)
+            parse_pdf_to_chunks(file_path, document_name, description, special_types, db_connection, bucket_key, user_id)
+            background_tasks.add_task(os.remove, file_path)
+
+    return {"status": "success", "uploaded": payload.bucket_keys}
+
+
+def archive_pdf(user_id: str, pdf_path: str, document_name: str, description: str, special_types: list[str]) -> tuple[str, str]:
     """
     Upload the original PDF to S3.
 
     Returns:
-        (bucket, key)
+        (key)
     """
     # create bucket
     s3session = boto3.Session(
@@ -47,36 +191,41 @@ def archive_pdf(pdf_path: str, document_id: str, document_name: str, description
     )
 
     s3client = s3session.client("s3")
+    bucket_name = os.getenv("AWS_S3_BUCKET")
+    if not bucket_name:
+        raise RuntimeError("AWS_S3_BUCKET is not configured")
 
-    safe_document_name = re.sub(
-        r"[^a-z0-9-]",
-        "-",
-        document_name.lower()
-    )
-    bucket_name = f"{safe_document_name}-{document_id}"
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
-    s3client.create_bucket(
-        Bucket=bucket_name,
-        CreateBucketConfiguration={
-            "LocationConstraint": "eu-west-2"
+    key = f"{user_id}/{document_name}_{timestamp}/"
+    file_key = f"{key}/contents.pdf"
+    meta_key = f"{key}/meta.json"
+
+    s3client.upload_file(
+        pdf_path,
+        bucket_name,
+        file_key,
+        ExtraArgs={
+            "ContentType": "application/pdf",
         }
     )
-    bucket = {
-        "Name": bucket_name
+
+    metadata = {
+        "document-name": document_name,
+        "description": description,
+        "special-types": special_types,
     }
 
-    key = f"documents/{document_id}/original.pdf"
-
-    s3.upload_file(
-        pdf_path,
-        bucket,
-        key,
-        ExtraArgs={
-            "ContentType": "application/pdf"
-        }
+    # Upload metadata
+    s3client.put_object(
+        Bucket=bucket_name,
+        Key=meta_key,
+        Body=json.dumps(metadata).encode("utf-8"),
+        ContentType="application/json",
     )
 
-    return bucket, key
+    return key
+
 
 def parse_pdf_to_chunks(pdf_path: str, document_name: str, document_desc: str, special_types: list[str], db_connection, bucket_key, user_id: str):
 
@@ -121,11 +270,9 @@ def find_relevances(client, text, text_description, document_name, chunk_no, spe
 
 def main_orchestrator(pdf_path, document_name, description, special_types, user_id):
 
-    document_id = str(uuid.uuid4()) # may be different to the supabase uuid
-
     # to be implemented later:
-    # bucket, bucket_key = archive_pdf(pdf_path, document_id, document_name, description, special_types, bucket)
-    bucket_key = "" # placeholder
+    bucket_key = archive_pdf(user_id, pdf_path, document_name, description, special_types)
+    #bucket_key = "" # placeholder
 
     # connect to database get db_connection
     sb_url = os.getenv("SUPABASE_URL")
@@ -163,15 +310,22 @@ async def upload_document(
         contents = await file.read()
         tmp.write(contents)
 
-        document_name =  f"{document_name}_{os.path.basename(file_path)}"
+        # document_id = str(uuid.uuid4())
+
+        new_document_name = re.sub(
+            r"[^a-z0-9-]",
+            "-",
+            document_name.lower()
+        )
+        # new_document_name = f"{new_document_name}-{document_id}"
 
         print("FILE UPLOADED")
 
-    await run_in_threadpool(main_orchestrator, file_path, document_name, description, special_types, user_id)
+    await run_in_threadpool(main_orchestrator, file_path, new_document_name, description, special_types, user_id)
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})
 
-    #background_tasks.add_task(os.remove, file_path)
+    background_tasks.add_task(os.remove, file_path)
 
     return {"status": "success", "document_name": document_name, "file_path": file_path}
 

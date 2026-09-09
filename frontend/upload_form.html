@@ -7,6 +7,8 @@
 <style>
   body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; color: #222; }
   h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.1rem; margin-top: 40px; }
+
   label { display: block; margin-top: 16px; font-weight: 600; font-size: 0.9rem; }
   input[type="text"], textarea {
     width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box;
@@ -24,6 +26,12 @@
   }
   button:disabled { background: #999; cursor: not-allowed; }
   #status { margin-top: 14px; font-size: 0.9rem; }
+
+  #archived-list {
+    max-height: 240px; overflow-y: auto; border: 1px solid #ccc;
+    border-radius: 4px; padding: 8px; margin-top: 10px; font-size: 0.9rem;
+  }
+  #archive-status { margin-top: 14px; font-size: 0.9rem; }
 </style>
 </head>
 <body>
@@ -57,6 +65,11 @@
   <div id="status"></div>
 
 </form>
+
+<h2>Archived documents</h2>
+<div id="archived-list">Loading archived documents...</div>
+<button type="button" id="restore-btn">Restore selected</button>
+<div id="archive-status"></div>
  
 <script>
   const SUPABASE_URL = "https://xymlbshoaxpteqopnyqq.supabase.co";
@@ -82,6 +95,7 @@
     const accessToken = await getAccessToken();
     if (!accessToken) return;
   }
+  
   checkSession()
 
   // Grab the form element and listen for its "submit" event.
@@ -163,6 +177,122 @@
     }
 
   });
+
+
+  // ---- Archived documents ----
+
+  const archivedListEl = document.getElementById("archived-list");
+  const archiveStatusEl = document.getElementById("archive-status");
+  const restoreBtn = document.getElementById("restore-btn");
+
+  // loading
+
+  async function loadArchivedDocuments() {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return; // already redirecting to sign-in.html
+
+    try {
+      const response = await fetch("/documents/archived/list", {
+        headers: { "Authorization": `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+      renderArchivedList(data.documents);
+    } catch (err) {
+      archivedListEl.textContent = `Failed to load archive: ${err.message}`;
+    }
+  }
+
+  function renderArchivedList(documents) {
+    archivedListEl.innerHTML = "";
+
+    if (documents.length === 0) {
+      archivedListEl.textContent = "No archived documents.";
+      return;
+    }
+
+    documents.forEach((doc) => {
+      const row = document.createElement("div");
+      row.className = "type-option";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "archived_docs";
+      checkbox.dataset.documentName = doc.document_name;
+      checkbox.dataset.timestamp = doc.timestamp;
+
+      const label = document.createElement("label");
+      label.textContent = `${doc.document_name} — ${doc.timestamp}`;
+
+      row.appendChild(checkbox);
+      row.appendChild(label);
+      archivedListEl.appendChild(row);
+    });
+  }
+
+  // uploading selected
+
+  restoreBtn.addEventListener("click", async () => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
+
+    const checkedBoxes = Array.from(
+      document.querySelectorAll('input[name="archived_docs"]:checked')
+    );
+
+    if (checkedBoxes.length === 0) {
+      archiveStatusEl.textContent = "Select at least one document.";
+      return;
+    }
+
+    // confusing:
+    const selected = checkedBoxes.map((cb) => ({
+      document_name: cb.dataset.documentName,
+      timestamp: cb.dataset.timestamp
+    }));
+
+    restoreBtn.disabled = true;
+    archiveStatusEl.textContent = "Restoring...";
+
+    try {
+      const response = await fetch("/documents/archived/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ documents: selected })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      archiveStatusEl.textContent = "Restored successfully.";
+
+      // Remove the restored rows directly from the DOM rather than
+      // re-fetching the whole list -- the backend doesn't yet filter
+      // out already-restored documents, so a re-fetch would show them
+      // again as if nothing happened.
+      // confusing
+      checkedBoxes.forEach((cb) => cb.closest(".type-option").remove());
+
+      if (archivedListEl.children.length === 0) {
+        archivedListEl.textContent = "No archived documents.";
+      }
+
+    } catch (err) {
+      archiveStatusEl.textContent = `Restore failed: ${err.message}`;
+    } finally {
+      restoreBtn.disabled = false;
+    }
+  });
+
+  loadArchivedDocuments();
+
 </script>
  
 </body>

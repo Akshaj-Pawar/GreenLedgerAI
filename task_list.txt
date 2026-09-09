@@ -1,11 +1,7 @@
 
-# saving into 3 bucket archive does not work
-# implement retrieving from the 3 bucket archive, with restricted access
-# accessing archived documents frontend (upload_form)
-
-# test and debug the new download buttons
-
+# test archival
 # add all of scope 1 / 2 / 3
+
 # find an even better form of chunking, don't send out the whole thing at once, may require intelligent merging
 # add and test vectorisation layer
 # human review chunking?
