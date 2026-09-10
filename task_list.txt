@@ -1,5 +1,4 @@
 
-# test archival
 # add all of scope 1 / 2 / 3
 
 # find an even better form of chunking, don't send out the whole thing at once, may require intelligent merging

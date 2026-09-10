@@ -64,16 +64,17 @@ def retrieve_archived_document(bucket_key: str, s3client):
         response["Body"].read().decode("utf-8")
     )
 
+    # retrieve file
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, dir=local_path) as tmp:
         local_file_path = tmp.name
-    
+
     response = s3client.download_file(
         bucket_name,
         file_key,
         local_file_path,
     )
 
-    document_name = metadata["document_name"]
+    document_name = metadata["document-name"]
     description = metadata["description"]
     special_types = metadata["special-types"]
 
@@ -168,12 +169,13 @@ async def upload_archived_documents(
             raise HTTPException(400, ...)
         else:
             # reconstruct key
-            bucket_key = f"{user_id}/{document_name}_{timestamp}/"
+            bucket_key = f"{user_id}/{document_name}_{timestamp}"
             file_path, description, special_types = retrieve_archived_document(bucket_key, s3client)
             parse_pdf_to_chunks(file_path, document_name, description, special_types, db_connection, bucket_key, user_id)
-            background_tasks.add_task(os.remove, file_path)
+            
+            #background_tasks.add_task(os.remove, file_path)
 
-    return {"status": "success", "uploaded": payload.bucket_keys}
+    return {"status": "success", "uploaded": payload.documents}
 
 
 def archive_pdf(user_id: str, pdf_path: str, document_name: str, description: str, special_types: list[str]) -> tuple[str, str]:
@@ -197,7 +199,7 @@ def archive_pdf(user_id: str, pdf_path: str, document_name: str, description: st
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
-    key = f"{user_id}/{document_name}_{timestamp}/"
+    key = f"{user_id}/{document_name}_{timestamp}"
     file_key = f"{key}/contents.pdf"
     meta_key = f"{key}/meta.json"
 
@@ -302,7 +304,6 @@ async def upload_document(
 
     cache_path = os.getenv("CACHE_PATH")
 
-    # tested and works
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, dir=cache_path) as tmp:
             
         file_path = tmp.name
@@ -325,7 +326,7 @@ async def upload_document(
 
     print({"status": "success", "document_name": document_name, "file_path": file_path})
 
-    background_tasks.add_task(os.remove, file_path)
+    #background_tasks.add_task(os.remove, file_path)
 
     return {"status": "success", "document_name": document_name, "file_path": file_path}
 

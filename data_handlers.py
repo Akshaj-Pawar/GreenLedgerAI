@@ -2,7 +2,7 @@ from supabase import create_client
 
 # This script contains all functions that directly interact with the superbase database
 # It is called by any script that needs to interact with said database
-# in order to run any function in this script a funcitonal supabase client must alreayd exist, and be provided as input
+# in order to run any function in this script a funcitonal supabase client must already exist, and be provided as input
 
 def get_documents_for_user(client, user_id):
     response = (
