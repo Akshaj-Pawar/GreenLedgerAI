@@ -103,6 +103,11 @@ def add_scope2_transaction_row(client, document_name, chunk_no_in_doc, merchant_
     }).execute()
     return response
 
+def add_scope1_transaction_row():
+    pass
+
+def add_scope3_transaction_row():
+    pass
 
 def get_display_rows(client, task_name, user_id, end_date=None, start_date=None):
     # from raw_text_cache: document_name, document_desc, page_no, chunk_no_in_doc, bucket_key, chunks
